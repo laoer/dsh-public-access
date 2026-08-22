@@ -1,0 +1,12 @@
+{
+  "name": "dsh-reverse-proxy",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness reverse proxy support - bind to 0.0.0.0 with crypto polyfill",
+  "type": "module",
+  "main": "src/reverse-proxy-fix.ts",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

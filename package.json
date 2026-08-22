@@ -1,9 +1,31 @@
 {
-  "name": "dsh-reverse-proxy",
-  "version": "1.0.0",
-  "description": "DeepSeek Harness reverse proxy support - bind to 0.0.0.0 with crypto polyfill",
+  "name": "dsh-public-access",
+  "version": "1.0.1",
+  "description": "DeepSeek Harness reverse proxy plugin - bind to 0.0.0.0, support public IP and nginx access",
   "type": "module",
-  "main": "src/reverse-proxy-fix.ts",
+  "main": "src/web-startup.js",
+  "files": [
+    "src/",
+    "cordis.patch.yml",
+    "start.sh",
+    "README.md"
+  ],
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "reverse-proxy",
+    "nginx"
+  ],
+  "author": "JNan-QQ",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/jn-qq/dsh-reverse-proxy.git"
+  },
+  "dependencies": {
+    "commander": "^15.0.0"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

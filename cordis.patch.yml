@@ -1,10 +1,9 @@
-# Override webserver to bind to 0.0.0.0 for reverse proxy access
-- id: webserver
-  config:
-    host: '0.0.0.0'
-    port: 3080
+# Replace the stock web-startup row so this bundle can explicitly opt in to
+# all-interface binding. The rest of the web app still derives LAN trustedHosts
+# through its official webRuntime -> connection path.
+- id: web-startup
+  disabled: true
 
-# Insert crypto polyfill plugin
 - insert:
-    - id: reverse-proxy-fix
-      name: './src/reverse-proxy-fix.ts'
+    - id: public-access-web-startup
+      name: 'dsh-public-access'

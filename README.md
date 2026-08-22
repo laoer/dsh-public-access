@@ -1,17 +1,15 @@
-# dsh-reverse-proxy
+# dsh-public-access
 
-DeepSeek Harness 反向代理插件 — 支持通过公网 IP 或 nginx 反向代理访问 Web UI。
-
-**无需修改 node_modules，完全通过插件系统实现。**
+DeepSeek Harness Web 插件。安装后可直接用 `dsh web --host 0.0.0.0` 对外提供访问。
 
 ## 安装
 
 ```bash
 # 安装插件到 web profile
-dsh plugin --profile web add /home/ubuntu/deepaeek-plugin
+dsh plugin --profile web add dsh-public-access
 
-# 启动（自动检测公网 IP 并传递 --trusted-host）
-./start.sh
+# 启动
+dsh web --host 0.0.0.0
 ```
 
 ## 使用
@@ -19,7 +17,7 @@ dsh plugin --profile web add /home/ubuntu/deepaeek-plugin
 ```bash
 ./start.sh
 # 等价于:
-# dsh --profile web --no-open --port 3080 --trusted-host 127.0.0.1 --trusted-host 43.139.254.202 ...
+# dsh --profile web --host 0.0.0.0 --no-open --port 3080
 ```
 
 ## 工作原理
@@ -28,26 +26,23 @@ dsh plugin --profile web add /home/ubuntu/deepaeek-plugin
 
 | 问题 | 解决方式 |
 |---|---|
-| WebServer 绑定 127.0.0.1 | `cordis.patch.yml` 覆盖为 0.0.0.0 |
-| API 特权接口只允许 loopback | HTTP 层拦截：将 `/api/*` 请求的 Host 头伪装为 127.0.0.1 |
-| 前端 isLoopback=false | 注入脚本：Cordis 初始化后 patch `connection.isLoopback = true` |
-| crypto.randomUUID 报错 | 注入 polyfill 脚本 |
-| API 403 forbidden | `--trusted-host` 传递公网 IP |
+| `--host 0.0.0.0` 被官方 web-startup 拒绝 | bundle 替换 `web-startup`，放行该参数 |
+| WebServer 绑定所有网卡后访问被挡 | 官方 `webRuntime -> connection` 链会自动推导 LAN trustedHosts |
+| 卸载后恢复默认 | 移除 bundle 后，原始 `dsh-web-app` 行恢复生效 |
 
 ## 文件结构
 
 ```
 dsh-reverse-proxy/
 ├── package.json            # DSH 插件包声明
-├── cordis.patch.yml        # 覆盖 webserver 绑定 0.0.0.0
+├── cordis.patch.yml        # 替换 web-startup 并挂载本包入口
 ├── src/
-│   └── reverse-proxy-fix.ts  # 插件代码
-├── start.sh                # 一键启动脚本
+│   └── web-startup.js      # 替代官方 web-startup 的插件入口
 └── README.md
 ```
 
 ## 卸载
 
 ```bash
-dsh plugin --profile web remove dsh-reverse-proxy
+dsh plugin --profile web remove dsh-public-access
 ```

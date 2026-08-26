@@ -3,20 +3,10 @@ import { validateSession, createSession, validateLogin, getLoginPage } from './a
 export const name = 'reverse-proxy-fix'
 export const inject = ['webServer', 'connection']
 
-function withApiRequestHeaders(req, callback) {
-  const originalHost = req.headers.host
-  const originalOrigin = req.headers.origin
-
+function rewriteApiRequestHeaders(req) {
   req.headers.host = '127.0.0.1:3080'
   req.headers.origin = 'http://127.0.0.1:3080'
-
-  try {
-    callback()
-  } finally {
-    req.headers.host = originalHost
-    if (originalOrigin === undefined) delete req.headers.origin
-    else req.headers.origin = originalOrigin
-  }
+  req.headers.referer = 'http://127.0.0.1:3080/'
 }
 
 export function apply(ctx) {
@@ -77,11 +67,10 @@ export function apply(ctx) {
       }
 
       if (url.startsWith('/api/')) {
-        withApiRequestHeaders(req, () => {
-          for (const listener of origListeners) {
-            listener.call(server, req, res)
-          }
-        })
+        rewriteApiRequestHeaders(req)
+        for (const listener of origListeners) {
+          listener.call(server, req, res)
+        }
       } else {
         for (const listener of origListeners) {
           listener.call(server, req, res)

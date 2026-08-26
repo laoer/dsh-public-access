@@ -18,15 +18,9 @@ function isCommanderError(error) {
 }
 
 function rewriteApiRequestHeaders(req) {
-  const originalHost = req.headers.host
-  const originalOrigin = req.headers.origin
   req.headers.host = '127.0.0.1:3080'
   req.headers.origin = 'http://127.0.0.1:3080'
-  return () => {
-    req.headers.host = originalHost
-    if (originalOrigin === undefined) delete req.headers.origin
-    else req.headers.origin = originalOrigin
-  }
+  req.headers.referer = 'http://127.0.0.1:3080/'
 }
 
 function installBrowserPolyfills(ctx) {
@@ -103,7 +97,13 @@ export function apply(ctx) {
       openBrowser: options.open,
       ...(options.host !== undefined ? { host: options.host } : {}),
       ...(options.port !== undefined ? { port: Number(options.port) } : {}),
-      trustedHosts: options.trustedHost ?? []
+      trustedHosts: [
+        '127.0.0.1',
+        '127.0.0.1:3080',
+        'localhost',
+        'localhost:3080',
+        ...(options.trustedHost ?? [])
+      ]
     })
   })
   const args = ctx.get('cmdlineArgs')

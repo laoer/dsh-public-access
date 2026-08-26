@@ -64,8 +64,13 @@ export function apply(ctx: Context) {
 
       // === Auth: check session for all other requests ===
       if (!validateSession(req.headers.cookie)) {
-        res.writeHead(302, { 'Location': '/_auth/login' })
-        res.end()
+        if (url.startsWith('/api/')) {
+          res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' })
+          res.end(JSON.stringify({ error: 'unauthorized' }))
+        } else {
+          res.writeHead(302, { 'Location': '/_auth/login' })
+          res.end()
+        }
         return
       }
 

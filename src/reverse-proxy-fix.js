@@ -1,0 +1,149 @@
+import { validateSession, createSession, validateLogin, getLoginPage } from './auth.js'
+
+export const name = 'reverse-proxy-fix'
+export const inject = ['webServer', 'connection']
+
+export function apply(ctx) {
+  console.log('[reverse-proxy-fix] Enabling reverse proxy support...')
+
+  const server = ctx.webServer.server
+  if (server) {
+    const origListeners = server.listeners('request').slice()
+    server.removeAllListeners('request')
+
+    server.on('request', (req, res) => {
+      const url = req.url || ''
+
+      // Auth: login page and endpoint do not require an existing session.
+      if (url === '/_auth/login') {
+        if (req.method === 'POST') {
+          const chunks = []
+          req.on('data', (chunk) => chunks.push(chunk))
+          req.on('end', () => {
+            const body = Buffer.concat(chunks).toString()
+            const params = new URLSearchParams(body)
+            const username = params.get('username') || ''
+            const password = params.get('password') || ''
+
+            if (validateLogin(username, password)) {
+              const sessionId = createSession()
+              res.writeHead(302, {
+                'Set-Cookie': `dsh_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
+                'Location': '/'
+              })
+              res.end()
+            } else {
+              res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+              res.end(getLoginPage('用户名或密码错误'))
+            }
+          })
+          return
+        }
+
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end(getLoginPage())
+        return
+      }
+
+      if (url === '/_auth/logout') {
+        res.writeHead(302, {
+          'Set-Cookie': 'dsh_session=; Path=/; HttpOnly; Max-Age=0',
+          'Location': '/_auth/login'
+        })
+        res.end()
+        return
+      }
+
+      if (!validateSession(req.headers.cookie)) {
+        res.writeHead(302, { 'Location': '/_auth/login' })
+        res.end()
+        return
+      }
+
+      if (url.startsWith('/api/')) {
+        const fakeHeaders = new Proxy(req.headers, {
+          get(target, prop) {
+            if (prop === 'host') return '127.0.0.1:3080'
+            return target[prop]
+          }
+        })
+        const fakeReq = new Proxy(req, {
+          get(target, prop) {
+            if (prop === 'headers') return fakeHeaders
+            return target[prop]
+          }
+        })
+        for (const listener of origListeners) {
+          listener.call(server, fakeReq, res)
+        }
+      } else {
+        for (const listener of origListeners) {
+          listener.call(server, req, res)
+        }
+      }
+    })
+    console.log('[reverse-proxy-fix] HTTP interceptor + auth installed')
+  }
+
+  const conn = ctx.get('connection')
+  if (conn) {
+    Object.defineProperty(conn, 'isLoopback', {
+      get: () => true,
+      configurable: true
+    })
+  }
+
+  ctx.on('webserver/index-inject', (table) => {
+    table.push({
+      kind: 'script',
+      placement: 'head',
+      text: `
+        var _patchInterval = setInterval(function() {
+          try {
+            var ctx = globalThis.__DSH_CONTEXT__ || globalThis.__cordis_context__;
+            if (ctx && ctx.get) {
+              var conn = ctx.get('connection');
+              if (conn && !conn.isLoopback) {
+                Object.defineProperty(conn, 'isLoopback', {
+                  get: function() { return true; },
+                  configurable: true
+                });
+                clearInterval(_patchInterval);
+              }
+            }
+          } catch(e) {}
+        }, 100);
+        setTimeout(function() { clearInterval(_patchInterval); }, 10000);
+      `
+    })
+  })
+
+  ctx.on('webserver/index-inject', (table) => {
+    table.push({
+      kind: 'script',
+      placement: 'head',
+      text: `
+        if (typeof crypto === 'undefined' || typeof crypto.randomUUID !== 'function') {
+          var cryptoShim = {
+            randomUUID: function() {
+              return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0;
+                var v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+              });
+            },
+            getRandomValues: function(arr) {
+              for (var i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256);
+              return arr;
+            }
+          };
+          if (typeof crypto === 'undefined') window.crypto = cryptoShim;
+          else {
+            if (typeof crypto.randomUUID !== 'function') crypto.randomUUID = cryptoShim.randomUUID;
+            if (typeof crypto.getRandomValues !== 'function') crypto.getRandomValues = cryptoShim.getRandomValues;
+          }
+        }
+      `
+    })
+  })
+}

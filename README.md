@@ -1,45 +1,40 @@
 # dsh-public-access
 
-DeepSeek Harness Web 插件。安装后可直接用 `dsh web --host 0.0.0.0` 对外提供访问。
+DeepSeek Harness 反向代理插件 — 支持公网 IP / nginx 访问 + 登录认证。
 
 ## 安装
 
 ```bash
-# 安装插件到 web profile
 dsh plugin --profile web add dsh-public-access
-
-# 启动
-dsh web --host 0.0.0.0
 ```
 
-## 使用
+## 启动
 
 ```bash
+# 使用默认账号 admin/admin
 ./start.sh
-# 等价于:
-# dsh --profile web --host 0.0.0.0 --no-open --port 3080
+
+# 自定义账号
+DSH_AUTH_USER=myuser DSH_AUTH_PASS=mypassword ./start.sh
 ```
 
-## 工作原理
+## 功能
 
-全部在 Cordis 插件层解决，不修改任何 node_modules 文件：
-
-| 问题 | 解决方式 |
+| 功能 | 说明 |
 |---|---|
-| `--host 0.0.0.0` 被官方 web-startup 拒绝 | bundle 替换 `web-startup`，放行该参数 |
-| WebServer 绑定所有网卡后访问被挡 | 官方 `webRuntime -> connection` 链会自动推导 LAN trustedHosts |
-| 卸载后恢复默认 | 移除 bundle 后，原始 `dsh-web-app` 行恢复生效 |
+| 绑定 0.0.0.0 | `cordis.patch.yml` 覆盖 webserver 配置 |
+| 登录认证 | 未登录自动跳转登录页，session 24h 有效 |
+| API 代理 | HTTP 层伪装 Host 为 localhost，绕过特权接口限制 |
+| 前端兼容 | 注入脚本 patch `connection.isLoopback` |
+| crypto polyfill | 公网 HTTP 环境支持 `crypto.randomUUID` |
 
-## 文件结构
+## 环境变量
 
-```
-dsh-reverse-proxy/
-├── package.json            # DSH 插件包声明
-├── cordis.patch.yml        # 替换 web-startup 并挂载本包入口
-├── src/
-│   └── web-startup.js      # 替代官方 web-startup 的插件入口
-└── README.md
-```
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `DSH_AUTH_USER` | `admin` | 登录用户名 |
+| `DSH_AUTH_PASS` | `admin` | 登录密码 |
+| `DSH_PORT` | `3080` | 监听端口 |
 
 ## 卸载
 

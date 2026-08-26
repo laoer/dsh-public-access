@@ -4,6 +4,22 @@ import { validateSession, createSession, validateLogin, getLoginPage } from './a
 export const name = 'reverse-proxy-fix'
 export const inject = ['webServer', 'connection']
 
+function withApiRequestHeaders(req: any, callback: () => void) {
+  const originalHost = req.headers.host
+  const originalOrigin = req.headers.origin
+
+  req.headers.host = '127.0.0.1:3080'
+  req.headers.origin = 'http://127.0.0.1:3080'
+
+  try {
+    callback()
+  } finally {
+    req.headers.host = originalHost
+    if (originalOrigin === undefined) delete req.headers.origin
+    else req.headers.origin = originalOrigin
+  }
+}
+
 export function apply(ctx: Context) {
   console.log('[reverse-proxy-fix] Enabling reverse proxy support...')
 
@@ -65,21 +81,11 @@ export function apply(ctx: Context) {
 
       // === API requests: spoof Host header to localhost ===
       if (url.startsWith('/api/')) {
-        const fakeHeaders = new Proxy(req.headers, {
-          get(target: any, prop: string) {
-            if (prop === 'host') return '127.0.0.1:3080'
-            return target[prop]
+        withApiRequestHeaders(req, () => {
+          for (const listener of origListeners) {
+            listener.call(server, req, res)
           }
         })
-        const fakeReq = new Proxy(req, {
-          get(target: any, prop: string) {
-            if (prop === 'headers') return fakeHeaders
-            return target[prop]
-          }
-        })
-        for (const listener of origListeners) {
-          listener.call(server, fakeReq, res)
-        }
       } else {
         for (const listener of origListeners) {
           listener.call(server, req, res)

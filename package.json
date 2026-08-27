@@ -1,6 +1,6 @@
 {
   "name": "dsh-public-access",
-  "version": "1.1.4",
+  "version": "1.2.0",
   "description": "DeepSeek Harness reverse proxy plugin - bind to 0.0.0.0, support public IP and nginx access, with login authentication",
   "type": "module",
   "main": "src/reverse-proxy-fix.js",
@@ -20,13 +20,26 @@
     "dsh",
     "reverse-proxy",
     "nginx",
-    "auth"
+    "auth",
+    "public-access",
+    "web-ui",
+    "authentication",
+    "proxy",
+    "remote-access"
   ],
   "author": "JNan-QQ",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://gitee.com/jn-qq/dsh-reverse-proxy.git"
+    "url": "https://gitee.com/jn-qq/dsh-public-access.git"
+  },
+  "scripts": {
+    "start": "./start.sh",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "homepage": "https://gitee.com/jn-qq/dsh-public-access",
+  "bugs": {
+    "url": "https://gitee.com/jn-qq/dsh-public-access/issues"
   },
   "dependencies": {
     "commander": "^15.0.0"

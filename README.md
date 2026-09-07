@@ -15,10 +15,10 @@ DeepSeek Harness 反向代理插件 — 支持公网 IP / nginx 访问 + 登录�
 
 | 功能 | 说明 |
 |------|------|
-| 🌐 **全接口绑定** | 通过 `cordis.patch.yml` 覆盖 webserver 配置，绑定到 `0.0.0.0` |
-| 🔐 **登录认证** | 未登录自动跳转登录页，会话有效期 24 小时 |
-| 🔄 **API 代理** | HTTP 层伪装 Host 为 localhost，绕过特权接口限制 |
-| 🖥️ **前端兼容** | 注入脚本 patch `connection.isLoopback`，确保前端功能正常 |
+| 🌐 **全接口绑定** | 通过自定义 `web-startup` 解除 dsh 对 `--host 0.0.0.0` 的安全限制，绑定全部接口 |
+| 🔐 **登录认证** | 在 dsh 0.1.x 浏览器令牌鉴权之上叠加用户名/密码登录，会话有效期 24 小时（两种鉴权并存） |
+| 🛡️ **信任栅栏** | 通过 `--trusted-host` 声明公网/LAN IP，绑定 `0.0.0.0` 时 dsh 自动派生 LAN 可信主机 |
+| 🖥️ **前端兼容** | 注入 `__DSH_TRANSPORT__.ownsHost`，使公网访问获得回环级 `isLoopback` 状态 |
 | 🔒 **crypto polyfill** | 公网 HTTP 环境支持 `crypto.randomUUID` 等 Web Crypto API |
 | 🚀 **自动检测** | 启动时自动检测公网 IP 和局域网 IP，自动配置 trusted-hosts |
 
@@ -175,12 +175,15 @@ server {
 
 ## 🔒 安全说明
 
-### 认证机制
+### 认证机制（dsh 0.1.x 适配）
 
-- **会话管理**：使用 HMAC-SHA256 签名的会话令牌
-- **会话有效期**：24 小时自动过期
-- **密码存储**：使用 SHA-256 加盐哈希存储
-- **安全比较**：使用 `timingSafeEqual` 防止时序攻击
+dsh 0.1.x 引入了浏览器令牌鉴权：每个进程生成一个随机启动令牌，访问 `http://<host>:<port>/?token=...` 后换取绑定该 authority 的签名 Cookie（默认 30 天有效）。本插件在该机制**之上**叠加用户名/密码登录，两种鉴权并存：
+
+- **插件登录（推荐，便于多人共享）**：访问根路径未登录时跳转 `/_auth/login`，使用 `DSH_AUTH_USER` / `DSH_AUTH_PASS` 登录，签发 24 小时有效的 `dsh_session` Cookie。
+- **dsh 令牌（备选）**：启动时控制台打印的 `?token=...` URL 仍可直接使用，换取 dsh 原生签名 Cookie。
+- **信任栅栏**：`/api` 请求需通过 dsh 的 Host/Origin 校验——本插件通过 `--trusted-host` 声明公网/LAN IP，绑定 `0.0.0.0` 时 dsh 还会自动派生 LAN IPv4 为可信主机。
+- **会话管理**：插件令牌使用 HMAC-SHA256 签名；密码使用 SHA-256 加盐哈希；比较使用 `timingSafeEqual` 防止时序攻击。
+- **前端兼容**：注入脚本设置 `globalThis.__DSH_TRANSPORT__.ownsHost = true`，使公网访问获得与回环一致的 `isLoopback` 状态（主机设置持久化、文件打开等功能可用）；并补齐公网 HTTP 下的 Web Crypto polyfill。
 
 ### 安全建议
 
@@ -249,9 +252,9 @@ journalctl -u dsh -f
 ```
 dsh-public-access/
 ├── src/
-│   ├── reverse-proxy-fix.js  # 主插件逻辑（认证 + API 代理 + polyfill）
+│   ├── reverse-proxy-fix.js  # 主插件逻辑（登录路由 + 鉴权适配 + polyfill）
 │   ├── auth.js               # 认证模块（会话管理、密码验证、登录页面）
-│   └── web-startup.js        # Web 启动配置（命令行参数解析）
+│   └── web-startup.js        # Web 启动配置（解除 0.0.0.0 限制、解析命令行参数）
 ├── cordis.patch.yml          # DSH 插件配置补丁
 ├── start.sh                  # 启动脚本
 ├── package.json              # 包配置

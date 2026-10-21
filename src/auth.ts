@@ -1,13 +1,6 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 
-// Simple session store
-const sessions = new Map<string, number>()
 const SESSION_TTL = 24 * 60 * 60 * 1000 // 24 hours
-
-// Generate a random session ID
-function generateSessionId(): string {
-  return randomBytes(32).toString('hex')
-}
 
 // Hash password with salt
 function hashPassword(password: string, salt: string): string {
@@ -22,37 +15,96 @@ function getCredentials() {
   return { username, password: hashPassword(password, salt), salt }
 }
 
-// Validate session cookie
+function getSessionSecret(): string {
+  const creds = getCredentials()
+  return `${creds.password}:${creds.salt}`
+}
+
+function signSession(expiresAt: number): string {
+  return createHmac('sha256', getSessionSecret()).update(String(expiresAt)).digest('hex')
+}
+
+/**
+ * Validate the plugin session cookie. The cookie name is matched only at the
+ * start of the header or after a `;`, so a similarly named foreign cookie
+ * cannot satisfy it.
+ * @param cookieHeader raw `Cookie` header.
+ * @returns true for an unexpired, correctly signed session.
+ */
 export function validateSession(cookieHeader: string | undefined): boolean {
   if (!cookieHeader) return false
-  const match = cookieHeader.match(/dsh_session=([a-f0-9]+)/)
+  const match = cookieHeader.match(/(?:^|;\s*)dsh_session=(\d+)\.([a-f0-9]+)/)
   if (!match) return false
-  const sessionId = match[1]
-  const expires = sessions.get(sessionId)
-  if (!expires) return false
-  if (Date.now() > expires) {
-    sessions.delete(sessionId)
-    return false
-  }
-  return true
+  const expiresAt = Number(match[1])
+  const signature = match[2]
+  if (!Number.isFinite(expiresAt) || Date.now() > expiresAt) return false
+
+  const expected = Buffer.from(signSession(expiresAt), 'hex')
+  const actual = Buffer.from(signature, 'hex')
+  if (expected.length !== actual.length) return false
+  return timingSafeEqual(expected, actual)
 }
 
 // Create a new session
 export function createSession(): string {
-  const sessionId = generateSessionId()
-  sessions.set(sessionId, Date.now() + SESSION_TTL)
-  return sessionId
+  const expiresAt = Date.now() + SESSION_TTL
+  return `${expiresAt}.${signSession(expiresAt)}`
 }
 
-// Validate login credentials
+/**
+ * Validate username/password against the environment credentials. Both
+ * comparisons use fixed-length byte buffers so a mismatch does not leak
+ * length or prefix information through timing.
+ * @param username submitted username.
+ * @param password submitted plaintext password.
+ * @returns true when both match.
+ */
 export function validateLogin(username: string, password: string): boolean {
   const creds = getCredentials()
-  return username === creds.username && hashPassword(password, creds.salt) === creds.password
+  const expectedUser = Buffer.from(creds.username)
+  const actualUser = Buffer.from(username)
+  const expectedPass = Buffer.from(creds.password, 'hex')
+  const actualPass = Buffer.from(hashPassword(password, creds.salt), 'hex')
+  const userOk =
+    expectedUser.length === actualUser.length && timingSafeEqual(expectedUser, actualUser)
+  const passOk =
+    expectedPass.length === actualPass.length && timingSafeEqual(expectedPass, actualPass)
+  return userOk && passOk
 }
 
-// Generate login page HTML
+/**
+ * Escape text placed into the login page's HTML. Error messages can include
+ * request-controlled values (for example a Host header), so this is not
+ * optional.
+ * @param value text to escape.
+ * @returns HTML-safe text.
+ */
+export function escapeHtml(value: unknown): string {
+  return String(value).replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case '&':
+        return '&amp;'
+      case '<':
+        return '&lt;'
+      case '>':
+        return '&gt;'
+      case '"':
+        return '&quot;'
+      default:
+        return '&#39;'
+    }
+  })
+}
+
+/**
+ * Render the login page. The form posts to its sibling `login`: from
+ * /_auth/login (or /ui/_auth/login) that resolves to /_auth/login (or
+ * /ui/_auth/login). `_auth/login` would resolve to /_auth/_auth/login.
+ * @param error optional error message shown above the form.
+ * @returns the complete HTML document.
+ */
 export function getLoginPage(error?: string): string {
-  const errorHtml = error ? `<div class="error">${error}</div>` : ''
+  const errorHtml = error ? `<div class="error">${escapeHtml(error)}</div>` : ''
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -149,7 +201,7 @@ export function getLoginPage(error?: string): string {
       <p>请登录以继续</p>
     </div>
     ${errorHtml}
-    <form method="POST" action="/_auth/login">
+    <form method="POST" action="login">
       <div class="form-group">
         <label>用户名</label>
         <input type="text" name="username" required autocomplete="username" autofocus>

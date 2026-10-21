@@ -1,6 +1,12 @@
 # Replace the stock web-startup row so this bundle can explicitly opt in to
-# all-interface binding. The rest of the web app still derives LAN trustedHosts
-# through its official webRuntime -> connection path.
+# all-interface binding. dsh 0.2.1 rejects wildcard addresses in both the stock
+# startup CLI and the webserver config schema, and it no longer derives LAN
+# trustedHosts itself. The replacement startup widens the boot-path webserver
+# host schema before providing webStartup, and it supplies the full
+# trustedHosts list (explicit --trusted-host values plus interface-derived LAN
+# authorities) that the stock `connection` row reads.
+#
+# Do not combine this bundle with another plugin that replaces `web-startup`.
 - id: web-startup
   disabled: true
 

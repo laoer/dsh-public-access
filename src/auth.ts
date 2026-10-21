@@ -24,10 +24,16 @@ function signSession(expiresAt: number): string {
   return createHmac('sha256', getSessionSecret()).update(String(expiresAt)).digest('hex')
 }
 
-// Validate session cookie
+/**
+ * Validate the plugin session cookie. The cookie name is matched only at the
+ * start of the header or after a `;`, so a similarly named foreign cookie
+ * cannot satisfy it.
+ * @param cookieHeader raw `Cookie` header.
+ * @returns true for an unexpired, correctly signed session.
+ */
 export function validateSession(cookieHeader: string | undefined): boolean {
   if (!cookieHeader) return false
-  const match = cookieHeader.match(/dsh_session=(\d+)\.([a-f0-9]+)/)
+  const match = cookieHeader.match(/(?:^|;\s*)dsh_session=(\d+)\.([a-f0-9]+)/)
   if (!match) return false
   const expiresAt = Number(match[1])
   const signature = match[2]
@@ -45,15 +51,60 @@ export function createSession(): string {
   return `${expiresAt}.${signSession(expiresAt)}`
 }
 
-// Validate login credentials
+/**
+ * Validate username/password against the environment credentials. Both
+ * comparisons use fixed-length byte buffers so a mismatch does not leak
+ * length or prefix information through timing.
+ * @param username submitted username.
+ * @param password submitted plaintext password.
+ * @returns true when both match.
+ */
 export function validateLogin(username: string, password: string): boolean {
   const creds = getCredentials()
-  return username === creds.username && hashPassword(password, creds.salt) === creds.password
+  const expectedUser = Buffer.from(creds.username)
+  const actualUser = Buffer.from(username)
+  const expectedPass = Buffer.from(creds.password, 'hex')
+  const actualPass = Buffer.from(hashPassword(password, creds.salt), 'hex')
+  const userOk =
+    expectedUser.length === actualUser.length && timingSafeEqual(expectedUser, actualUser)
+  const passOk =
+    expectedPass.length === actualPass.length && timingSafeEqual(expectedPass, actualPass)
+  return userOk && passOk
 }
 
-// Generate login page HTML
+/**
+ * Escape text placed into the login page's HTML. Error messages can include
+ * request-controlled values (for example a Host header), so this is not
+ * optional.
+ * @param value text to escape.
+ * @returns HTML-safe text.
+ */
+export function escapeHtml(value: unknown): string {
+  return String(value).replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case '&':
+        return '&amp;'
+      case '<':
+        return '&lt;'
+      case '>':
+        return '&gt;'
+      case '"':
+        return '&quot;'
+      default:
+        return '&#39;'
+    }
+  })
+}
+
+/**
+ * Render the login page. The form action is relative so the page also works
+ * behind a prefix-stripping proxy: the browser may see /ui/_auth/login while
+ * dsh sees /_auth/login.
+ * @param error optional error message shown above the form.
+ * @returns the complete HTML document.
+ */
 export function getLoginPage(error?: string): string {
-  const errorHtml = error ? `<div class="error">${error}</div>` : ''
+  const errorHtml = error ? `<div class="error">${escapeHtml(error)}</div>` : ''
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -150,7 +201,7 @@ export function getLoginPage(error?: string): string {
       <p>请登录以继续</p>
     </div>
     ${errorHtml}
-    <form method="POST" action="/_auth/login">
+    <form method="POST" action="_auth/login">
       <div class="form-group">
         <label>用户名</label>
         <input type="text" name="username" required autocomplete="username" autofocus>

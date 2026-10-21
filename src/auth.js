@@ -95,9 +95,9 @@ export function escapeHtml(value) {
 
 export function getLoginPage(error) {
   const errorHtml = error ? `<div class="error">${escapeHtml(error)}</div>` : ''
-  // Relative form action keeps the page usable behind a prefix-stripping
-  // proxy (`--public-url https://app.example/ui/`), where the browser sees
-  // /ui/_auth/login but dsh sees /_auth/login.
+  // The form posts to its sibling `login`: from /_auth/login (or
+  // /ui/_auth/login) that resolves to /_auth/login (or /ui/_auth/login).
+  // `_auth/login` would resolve to /_auth/_auth/login and 405.
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -194,7 +194,7 @@ export function getLoginPage(error) {
       <p>请登录以继续</p>
     </div>
     ${errorHtml}
-    <form method="POST" action="_auth/login">
+    <form method="POST" action="login">
       <div class="form-group">
         <label>用户名</label>
         <input type="text" name="username" required autocomplete="username" autofocus>

@@ -3,6 +3,15 @@ import { validateSession, createSession, validateLogin, getLoginPage, escapeHtml
 export const name = 'reverse-proxy-fix'
 export const inject = ['webServer', 'connection', 'webStartup']
 
+// Relative redirect targets. They are relative on purpose so the same
+// handlers work at the root and behind a prefix-stripping proxy:
+// - after login, `../` goes from /_auth/login to / (or /ui/_auth/login to /ui/)
+// - after logout, `login` goes from /_auth/logout to /_auth/login (sibling)
+// - the index redirect goes from / to /_auth/login (or /ui/ to /ui/_auth/login)
+export const LOGIN_SUCCESS_LOCATION = '../'
+export const LOGOUT_LOCATION = 'login'
+export const INDEX_LOGIN_LOCATION = './_auth/login'
+
 // Cookie attributes shared by every dsh_session cookie we issue or clear.
 const SESSION_COOKIE = 'dsh_session'
 const SESSION_MAX_AGE = 24 * 60 * 60 // 24 hours, in seconds
@@ -109,7 +118,9 @@ function handleLoginRoute(ctx: any, req: any, res: any): void {
           isSecureRequest(ctx, req)
         ),
         'Cache-Control': 'no-store',
-        'Location': './'
+        // From /_auth/login (or /ui/_auth/login) `../` resolves to `/`
+        // (or `/ui/`); `./` would resolve to the /_auth/ directory.
+        'Location': LOGIN_SUCCESS_LOCATION
       })
       res.end()
     } else {
@@ -137,10 +148,13 @@ function handleLogoutRoute(ctx: any, req: any, res: any): void {
       cookies.push(sessionCookie(name, '', 0, secure))
     }
   }
+  // From /_auth/logout (or /ui/_auth/logout) `login` resolves to the
+  // sibling /_auth/login (or /ui/_auth/login); `./_auth/login` would
+  // duplicate the /_auth/ segment.
   res.writeHead(302, {
     'Set-Cookie': cookies,
     'Cache-Control': 'no-store',
-    'Location': './_auth/login'
+    'Location': LOGOUT_LOCATION
   })
   res.end()
 }
@@ -204,7 +218,7 @@ export function installConnectionAuth(conn: ConnectionLike, options: AuthOptions
     }
     if (url.searchParams.has('token')) return origAuthorizeIndex(req, res)
     if (origRequestRejection(req) === undefined) return true
-    res.writeHead(302, { 'Cache-Control': 'no-store', 'Location': './_auth/login' })
+    res.writeHead(302, { 'Cache-Control': 'no-store', 'Location': INDEX_LOGIN_LOCATION })
     res.end()
     return false
   }

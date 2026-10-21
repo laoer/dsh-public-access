@@ -97,9 +97,9 @@ export function escapeHtml(value: unknown): string {
 }
 
 /**
- * Render the login page. The form action is relative so the page also works
- * behind a prefix-stripping proxy: the browser may see /ui/_auth/login while
- * dsh sees /_auth/login.
+ * Render the login page. The form posts to its sibling `login`: from
+ * /_auth/login (or /ui/_auth/login) that resolves to /_auth/login (or
+ * /ui/_auth/login). `_auth/login` would resolve to /_auth/_auth/login.
  * @param error optional error message shown above the form.
  * @returns the complete HTML document.
  */
@@ -201,7 +201,7 @@ export function getLoginPage(error?: string): string {
       <p>请登录以继续</p>
     </div>
     ${errorHtml}
-    <form method="POST" action="_auth/login">
+    <form method="POST" action="login">
       <div class="form-group">
         <label>用户名</label>
         <input type="text" name="username" required autocomplete="username" autofocus>

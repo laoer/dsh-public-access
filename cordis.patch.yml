@@ -12,7 +12,7 @@
 
 - insert:
     - id: public-access-web-startup
-      name: '@laoer/dsh-public-access/web-startup'
+      name: '@timgong/dsh-public-access/web-startup'
 
     - id: public-access-reverse-proxy
-      name: '@laoer/dsh-public-access'
+      name: '@timgong/dsh-public-access'

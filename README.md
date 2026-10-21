@@ -1,14 +1,14 @@
-# dsh-public-access（`@laoer/dsh-public-access`）
+# dsh-public-access（`@timgong/dsh-public-access`）
 
 DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`--public-url` / TLS、nginx，以及用户名密码登录认证。
 
-> **包名**：`@laoer/dsh-public-access`（fork 自 JNan-QQ/dsh-public-access）。
+> **包名**：`@timgong/dsh-public-access`（fork 自 JNan-QQ/dsh-public-access）。
 >
 > **兼容性**：2.1.0 适配 **dsh 0.2.1-rc.2**（`>=0.2.1-rc.2 <0.3.0`）。dsh 0.1.x 请继续使用 1.3.0。
 
 ## 📖 简介
 
-`@laoer/dsh-public-access` 是一个 DeepSeek Harness 插件，用于将本地开发环境暴露到公网或局域网，同时提供安全的登录认证机制。该插件解决了以下核心问题：
+`@timgong/dsh-public-access` 是一个 DeepSeek Harness 插件，用于将本地开发环境暴露到公网或局域网，同时提供安全的登录认证机制。该插件解决了以下核心问题：
 
 - **网络绑定**：dsh 0.2.1 在 CLI 和 `webserver` 配置 schema 两处都拒绝通配地址；插件在 boot 路径上就地放宽 `WebServer.Config.host`，重新允许 `0.0.0.0` / `::`
 - **安全认证**：在 dsh 原生启动令牌 / 签名 Cookie 之上叠加用户名密码登录，插件会话 24 小时有效
@@ -29,11 +29,11 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 
 ## ⬆️ 从 1.3.0 / 2.0.0 升级到 2.1.0
 
-0.1.x → 0.2.1 的上游鉴权入口和行为都变了，2.0.0 是 breaking release；2.1.0 同时把包名从 `dsh-public-access` 改为 **`@laoer/dsh-public-access`**，因此需要先移除旧包再安装新包：
+0.1.x → 0.2.1 的上游鉴权入口和行为都变了，2.0.0 是 breaking release；2.1.0 同时把包名从 `dsh-public-access` 改为 **`@timgong/dsh-public-access`**，因此需要先移除旧包再安装新包：
 
 1. 先把 dsh 升级到 `0.2.1-rc.2`；
 2. 移除旧包：`dsh plugin --profile web remove dsh-public-access`；
-3. 安装新包：`dsh plugin --profile web add @laoer/dsh-public-access@2.1.0`（未发布 npm 时用 `github:laoer/dsh-public-access` 或本地路径）；
+3. 安装新包：`dsh plugin --profile web add @timgong/dsh-public-access@2.1.0`（未发布 npm 时用 `github:laoer/dsh-public-access` 或本地路径）；
 4. 重启 `dsh --profile web`；
 5. 确认启动日志没有 `webserver: ... wildcard ...`，并访问 `/` 检查是否跳转 `/_auth/login`；
 6. 已签发的 `dsh_session` 仍有效，通常不需要重新登录。
@@ -46,7 +46,7 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 
 ```bash
 # 已发布到 npm 时
-dsh plugin --profile web add @laoer/dsh-public-access@2.1.0
+dsh plugin --profile web add @timgong/dsh-public-access@2.1.0
 
 # 未发布 npm 时，从 GitHub 仓库安装（pnpm 读取仓库里的 package.json）
 dsh plugin --profile web add github:laoer/dsh-public-access

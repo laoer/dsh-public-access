@@ -177,7 +177,7 @@ ctx.sessionPersistence.restoreArchived(sessionId)
 
 ### 3.2 方案二：扩展现有插件
 
-在现有的 `@laoer/dsh-public-access` 插件中添加设置界面扩展。这种方式更简单，但会增加插件的复杂度。
+在现有的 `@timgong/dsh-public-access` 插件中添加设置界面扩展。这种方式更简单，但会增加插件的复杂度。
 
 ### 3.3 方案三：直接修改 DSH 核心包
 
@@ -547,7 +547,7 @@ mcp:
       "bundles": [
         "@deepseek-ai/dsh-base",
         "@deepseek-ai/dsh-web-app",
-        "@laoer/dsh-public-access",
+        "@timgong/dsh-public-access",
         "dsh-settings-extensions"
       ]
     }

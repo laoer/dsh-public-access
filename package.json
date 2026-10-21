@@ -1,5 +1,5 @@
 {
-  "name": "@laoer/dsh-public-access",
+  "name": "@timgong/dsh-public-access",
   "version": "2.1.0",
   "description": "DeepSeek Harness plugin - public/LAN access (0.0.0.0 + trusted hosts) with login auth, compatible with dsh 0.2.1-rc.2 (laoer fork)",
   "type": "module",
@@ -31,7 +31,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/laoer/dsh-public-access.git"
+    "url": "git+https://github.com/laoer/dsh-public-access.git"
   },
   "scripts": {
     "start": "./start.sh",

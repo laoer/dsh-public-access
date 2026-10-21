@@ -1,12 +1,14 @@
-# dsh-public-access
+# dsh-public-access（`@laoer/dsh-public-access`）
 
 DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`--public-url` / TLS、nginx，以及用户名密码登录认证。
 
-> **兼容性**：2.0.0 适配 **dsh 0.2.1-rc.2**（`>=0.2.1-rc.2 <0.3.0`）。dsh 0.1.x 请继续使用 1.3.0。
+> **包名**：`@laoer/dsh-public-access`（fork 自 JNan-QQ/dsh-public-access）。
+>
+> **兼容性**：2.1.0 适配 **dsh 0.2.1-rc.2**（`>=0.2.1-rc.2 <0.3.0`）。dsh 0.1.x 请继续使用 1.3.0。
 
 ## 📖 简介
 
-`dsh-public-access` 是一个 DeepSeek Harness 插件，用于将本地开发环境暴露到公网或局域网，同时提供安全的登录认证机制。该插件解决了以下核心问题：
+`@laoer/dsh-public-access` 是一个 DeepSeek Harness 插件，用于将本地开发环境暴露到公网或局域网，同时提供安全的登录认证机制。该插件解决了以下核心问题：
 
 - **网络绑定**：dsh 0.2.1 在 CLI 和 `webserver` 配置 schema 两处都拒绝通配地址；插件在 boot 路径上就地放宽 `WebServer.Config.host`，重新允许 `0.0.0.0` / `::`
 - **安全认证**：在 dsh 原生启动令牌 / 签名 Cookie 之上叠加用户名密码登录，插件会话 24 小时有效
@@ -25,31 +27,39 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 | 🚀 **自动检测** | `start.sh` 自动探测公网 IP 并配置 trusted-host / public-url；LAN 地址由 `web-startup` 按网卡推导 |
 | 🧹 **可撤销登出** | 登出同时清除 `dsh_session` 与请求中所有 `dsh-auth-*` 原生 Cookie |
 
-## ⬆️ 从 1.3.0 升级到 2.0.0
+## ⬆️ 从 1.3.0 / 2.0.0 升级到 2.1.0
 
-0.1.x → 0.2.1 的上游鉴权入口和行为都变了，2.0.0 是 breaking release：
+0.1.x → 0.2.1 的上游鉴权入口和行为都变了，2.0.0 是 breaking release；2.1.0 同时把包名从 `dsh-public-access` 改为 **`@laoer/dsh-public-access`**，因此需要先移除旧包再安装新包：
 
 1. 先把 dsh 升级到 `0.2.1-rc.2`；
-2. 重新安装插件：`dsh plugin --profile web add dsh-public-access@2.0.0`（或 `dsh plugin --profile web add .`）；
-3. 重启 `dsh --profile web`；
-4. 确认启动日志没有 `webserver: ... wildcard ...`，并访问 `/` 检查是否跳转 `/_auth/login`；
-5. 已签发的 `dsh_session` 仍有效，通常不需要重新登录。
+2. 移除旧包：`dsh plugin --profile web remove dsh-public-access`；
+3. 安装新包：`dsh plugin --profile web add @laoer/dsh-public-access@2.1.0`（未发布 npm 时用 `github:laoer/dsh-public-access` 或本地路径）；
+4. 重启 `dsh --profile web`；
+5. 确认启动日志没有 `webserver: ... wildcard ...`，并访问 `/` 检查是否跳转 `/_auth/login`；
+6. 已签发的 `dsh_session` 仍有效，通常不需要重新登录。
 
-如果仍在使用 dsh 0.1.x，请继续使用插件 1.3.0，不要升级到 2.0.0。
+如果仍在使用 dsh 0.1.x，请继续使用插件 1.3.0，不要升级到 2.x。
 
 ## 📦 安装
 
 ### 方式一：通过 DSH 插件管理器安装（推荐）
 
 ```bash
-dsh plugin --profile web add dsh-public-access@2.0.0
+# 已发布到 npm 时
+dsh plugin --profile web add @laoer/dsh-public-access@2.1.0
+
+# 未发布 npm 时，从 GitHub 仓库安装（pnpm 读取仓库里的 package.json）
+dsh plugin --profile web add github:laoer/dsh-public-access
+
+# 固定 commit，便于复现
+dsh plugin --profile web add 'github:laoer/dsh-public-access#<commit>'
 ```
 
 ### 方式二：手动安装 / 本地开发
 
 ```bash
 # 克隆仓库
-git clone https://gitee.com/jn-qq/dsh-public-access.git
+git clone https://github.com/laoer/dsh-public-access.git
 cd dsh-public-access
 
 # 安装依赖
@@ -60,6 +70,8 @@ pnpm install
 dsh plugin --profile web add .
 ```
 
+> 从旧包升级时，务必先 `dsh plugin --profile web remove dsh-public-access`；新旧包名不同，直接 add 会留下旧 bundle。
+>
 > 不要用 `npm link` 直接全局链接后期待它自动解析 dsh 内部包；dsh 的 runtime resolution 以 profile 根为锚点，`dsh plugin add .` 才是受支持的开发安装方式。
 
 ## 🚀 使用方法
@@ -376,7 +388,7 @@ dsh-public-access/
 
 ```bash
 # 克隆仓库
-git clone https://gitee.com/jn-qq/dsh-public-access.git
+git clone https://github.com/laoer/dsh-public-access.git
 cd dsh-public-access
 
 # 安装依赖
@@ -402,9 +414,9 @@ dsh plugin --profile web add .
 
 ## 🔗 相关链接
 
-- **仓库地址**：https://gitee.com/jn-qq/dsh-public-access.git
-- **DeepSeek Harness**：https://github.com/deepseek-ai/dsh
-- **问题反馈**：https://gitee.com/jn-qq/dsh-public-access/issues
+- **仓库地址**：https://github.com/laoer/dsh-public-access
+- **DeepSeek Harness**：https://github.com/deepseek-ai/deepseek-harness
+- **问题反馈**：https://github.com/laoer/dsh-public-access/issues
 
 ## 📞 支持
 

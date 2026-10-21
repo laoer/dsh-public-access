@@ -65,7 +65,7 @@ Examples:
   dsh --profile web                          serve on the composed host and port
   dsh --profile web --no-open                serve without opening a browser
   dsh --profile web --port 8080              serve on another port
-  dsh --profile web --host 0.0.0.0           bind all IPv4 interfaces (public access via dsh-public-access)
+  dsh --profile web --host 0.0.0.0           bind all IPv4 interfaces (public access via @laoer/dsh-public-access)
   dsh --profile web --host ::                bind all interfaces over IPv6 (dual-stack where supported)
   dsh --profile web --public-url https://app.example/ui/ --trusted-host app.example
                                              advertise a prefix-stripping HTTPS proxy entry
@@ -144,7 +144,7 @@ export function apply(ctx: any): void {
 
   const args = ctx.get('cmdlineArgs')
   const exit = ctx.get('appExit')
-  if (args === undefined || exit === undefined) throw new Error('dsh-public-access: missing cmdlineArgs/appExit services')
+  if (args === undefined || exit === undefined) throw new Error('@laoer/dsh-public-access: missing cmdlineArgs/appExit services')
   try {
     program.parse(args.get(), { from: 'user' })
   } catch (error) {

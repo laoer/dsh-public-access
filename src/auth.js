@@ -1,12 +1,6 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 
-// Simple session store
-const sessions = new Map()
 const SESSION_TTL = 24 * 60 * 60 * 1000 // 24 hours
-
-function generateSessionId() {
-  return randomBytes(32).toString('hex')
-}
 
 function hashPassword(password, salt) {
   return createHash('sha256').update(salt + password).digest('hex')
@@ -19,24 +13,32 @@ function getCredentials() {
   return { username, password: hashPassword(password, salt), salt }
 }
 
+function getSessionSecret() {
+  const creds = getCredentials()
+  return `${creds.password}:${creds.salt}`
+}
+
+function signSession(expiresAt) {
+  return createHmac('sha256', getSessionSecret()).update(String(expiresAt)).digest('hex')
+}
+
 export function validateSession(cookieHeader) {
   if (!cookieHeader) return false
-  const match = cookieHeader.match(/dsh_session=([a-f0-9]+)/)
+  const match = cookieHeader.match(/dsh_session=(\d+)\.([a-f0-9]+)/)
   if (!match) return false
-  const sessionId = match[1]
-  const expires = sessions.get(sessionId)
-  if (!expires) return false
-  if (Date.now() > expires) {
-    sessions.delete(sessionId)
-    return false
-  }
-  return true
+  const expiresAt = Number(match[1])
+  const signature = match[2]
+  if (!Number.isFinite(expiresAt) || Date.now() > expiresAt) return false
+
+  const expected = Buffer.from(signSession(expiresAt), 'hex')
+  const actual = Buffer.from(signature, 'hex')
+  if (expected.length !== actual.length) return false
+  return timingSafeEqual(expected, actual)
 }
 
 export function createSession() {
-  const sessionId = generateSessionId()
-  sessions.set(sessionId, Date.now() + SESSION_TTL)
-  return sessionId
+  const expiresAt = Date.now() + SESSION_TTL
+  return `${expiresAt}.${signSession(expiresAt)}`
 }
 
 export function validateLogin(username, password) {

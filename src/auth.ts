@@ -1,13 +1,6 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 
-// Simple session store
-const sessions = new Map<string, number>()
 const SESSION_TTL = 24 * 60 * 60 * 1000 // 24 hours
-
-// Generate a random session ID
-function generateSessionId(): string {
-  return randomBytes(32).toString('hex')
-}
 
 // Hash password with salt
 function hashPassword(password: string, salt: string): string {
@@ -22,26 +15,34 @@ function getCredentials() {
   return { username, password: hashPassword(password, salt), salt }
 }
 
+function getSessionSecret(): string {
+  const creds = getCredentials()
+  return `${creds.password}:${creds.salt}`
+}
+
+function signSession(expiresAt: number): string {
+  return createHmac('sha256', getSessionSecret()).update(String(expiresAt)).digest('hex')
+}
+
 // Validate session cookie
 export function validateSession(cookieHeader: string | undefined): boolean {
   if (!cookieHeader) return false
-  const match = cookieHeader.match(/dsh_session=([a-f0-9]+)/)
+  const match = cookieHeader.match(/dsh_session=(\d+)\.([a-f0-9]+)/)
   if (!match) return false
-  const sessionId = match[1]
-  const expires = sessions.get(sessionId)
-  if (!expires) return false
-  if (Date.now() > expires) {
-    sessions.delete(sessionId)
-    return false
-  }
-  return true
+  const expiresAt = Number(match[1])
+  const signature = match[2]
+  if (!Number.isFinite(expiresAt) || Date.now() > expiresAt) return false
+
+  const expected = Buffer.from(signSession(expiresAt), 'hex')
+  const actual = Buffer.from(signature, 'hex')
+  if (expected.length !== actual.length) return false
+  return timingSafeEqual(expected, actual)
 }
 
 // Create a new session
 export function createSession(): string {
-  const sessionId = generateSessionId()
-  sessions.set(sessionId, Date.now() + SESSION_TTL)
-  return sessionId
+  const expiresAt = Date.now() + SESSION_TTL
+  return `${expiresAt}.${signSession(expiresAt)}`
 }
 
 // Validate login credentials

@@ -4,7 +4,7 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 
 > **包名**：`@timgong/dsh-public-access`（fork 自 JNan-QQ/dsh-public-access）。
 >
-> **兼容性**：2.1.1 适配 **dsh 0.2.1-rc.2**（`>=0.2.1-rc.2 <0.3.0`）。dsh 0.1.x 请继续使用 1.3.0。
+> **兼容性**：2.1.2 适配 **dsh 0.2.1-rc.2**（`>=0.2.1-rc.2 <0.3.0`）。dsh 0.1.x 请继续使用 1.3.0。
 
 ## 📖 简介
 
@@ -27,13 +27,13 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 | 🚀 **自动检测** | `start.sh` 自动探测公网 IP 并配置 trusted-host / public-url；LAN 地址由 `web-startup` 按网卡推导 |
 | 🧹 **可撤销登出** | 登出同时清除 `dsh_session` 与请求中所有 `dsh-auth-*` 原生 Cookie |
 
-## ⬆️ 从 1.3.0 / 2.0.0 升级到 2.1.1
+## ⬆️ 从 1.3.0 / 2.0.0 升级到 2.1.2
 
 0.1.x → 0.2.1 的上游鉴权入口和行为都变了，2.0.0 是 breaking release；2.1.1 同时把包名从 `dsh-public-access` 改为 **`@timgong/dsh-public-access`**，因此需要先移除旧包再安装新包：
 
 1. 先把 dsh 升级到 `0.2.1-rc.2`；
 2. 移除旧包：`dsh plugin --profile web remove dsh-public-access`；
-3. 安装新包：`dsh plugin --profile web add @timgong/dsh-public-access@2.1.1`（未发布 npm 时用 `github:laoer/dsh-public-access` 或本地路径）；
+3. 安装新包：`dsh plugin --profile web add @timgong/dsh-public-access@2.1.2`（未发布 npm 时用 `github:laoer/dsh-public-access` 或本地路径）；
 4. 重启 `dsh --profile web`；
 5. 确认启动日志没有 `webserver: ... wildcard ...`，并访问 `/` 检查是否跳转 `/_auth/login`；
 6. 已签发的 `dsh_session` 仍有效，通常不需要重新登录。
@@ -46,7 +46,7 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 
 ```bash
 # 已发布到 npm 时
-dsh plugin --profile web add @timgong/dsh-public-access@2.1.1
+dsh plugin --profile web add @timgong/dsh-public-access@2.1.2
 
 # 未发布 npm 时，从 GitHub 仓库安装（pnpm 读取仓库里的 package.json）
 dsh plugin --profile web add github:laoer/dsh-public-access
@@ -320,11 +320,11 @@ dsh --profile web --dump-config | grep -A3 web-startup
 
 #### 4. 登录 POST 返回 405，地址是 `/_auth/_auth/login`
 
-2.1.0 的登录表单使用了错误的相对路径（`_auth/login`），从 `/_auth/login` 会拼成 `/_auth/_auth/login`。2.1.1 已改为同级 `login`，并修正登录成功/登出的相对跳转。升级到 2.1.1 后强制刷新登录页（或清缓存）：
+2.1.0 的登录表单使用了错误的相对路径（`_auth/login`），从 `/_auth/login` 会拼成 `/_auth/_auth/login`。2.1.1 已改为同级 `login`，并修正登录成功/登出的相对跳转。升级到 2.1.2 后强制刷新登录页（或清缓存）：
 
 ```bash
 dsh plugin --profile web remove dsh-public-access
-dsh plugin --profile web add @timgong/dsh-public-access@2.1.1
+dsh plugin --profile web add @timgong/dsh-public-access@2.1.2
 sudo systemctl restart dsh
 ```
 

@@ -1,6 +1,6 @@
 {
   "name": "@timgong/dsh-public-access",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "DeepSeek Harness plugin - public/LAN access (0.0.0.0 + trusted hosts) with login auth, compatible with dsh 0.2.1-rc.2 (laoer fork)",
   "type": "module",
   "main": "src/reverse-proxy-fix.js",

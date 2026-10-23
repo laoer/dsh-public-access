@@ -420,7 +420,7 @@ dsh plugin --profile web add .
 
 ## 📄 许可证
 
-本项目采用 [MIT 许可证](LICENSE)。
+本项目采用[木兰宽松许可证，第 2 版](LICENSE)（MulanPSL-2.0）。
 
 ## 🔗 相关链接
 

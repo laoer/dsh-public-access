@@ -28,7 +28,13 @@
     "remote-access"
   ],
   "author": "Tim Gong <tianyisoft@gmail.com>",
-  "license": "MIT",
+  "contributors": [
+    {
+      "name": "JNan-QQ",
+      "url": "https://github.com/JNan-QQ"
+    }
+  ],
+  "license": "MulanPSL-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/laoer/dsh-public-access.git"

@@ -34,6 +34,10 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 | 🚀 **自动检测** | `start.sh` 自动探测公网 IP 并配置 trusted-host / public-url；LAN 地址由 `web-startup` 按网卡推导 |
 | 🧹 **可撤销登出** | 登出同时清除 `dsh_session` 与请求中所有 `dsh-auth-*` 原生 Cookie |
 
+设置面板 → 认证（实机截图，左：中文；`docs/settings-panel.en.png` 为英文）：
+
+![设置面板 → 认证](docs/settings-panel.zh.png)
+
 ## ⬆️ 升级到 2.2.0-beta.2（预发布）
 
 > **预发布**：`2.2.0-beta.2` 是测试版，用来验证凭据文件、登录限速与「设置 → 认证」面板；稳定后再发正式版 `2.2.0`。安装请写显式版本号（`@2.2.0-beta.2`），预发布版本不会被 `@latest` 命中。

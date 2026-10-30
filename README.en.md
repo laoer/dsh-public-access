@@ -30,6 +30,10 @@ Public / LAN access plugin for DeepSeek Harness — `0.0.0.0` binding, `--public
 | 🚀 **Auto-detection** | `start.sh` detects the public IP and configures trusted-host / public-url; LAN addresses are derived from the NICs by `web-startup` |
 | 🧹 **Revocable logout** | Logout clears `dsh_session` and every `dsh-auth-*` native cookie carried by the request |
 
+Settings → Auth (live screenshot; `docs/settings-panel.zh.png` is the Chinese build):
+
+![Settings → Auth](docs/settings-panel.en.png)
+
 ## ⬆️ Upgrading to 2.2.0-beta.2 (pre-release)
 
 > **Pre-release**: `2.2.0-beta.2` is a test build for the credential store, login throttling and the Settings → Auth panel; the stable `2.2.0` follows once it settles. Install it by explicit version (`@2.2.0-beta.2`) — pre-releases are never picked up by `@latest`.

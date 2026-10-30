@@ -607,6 +607,25 @@ function guardOtherRoutes(ctx, isPublicRoute) {
     };
 }
 /**
+ * Paths that are unauthenticated by design or already gated by dsh itself.
+ *
+ * `/api` (and its prefix) passes `connection.admit`, the index passes
+ * `authorizeIndex`, `/connect` is the upstream launch-token exchange, and
+ * `/plugins` serves the client module bundles the page needs before any
+ * session exists. Reporting them as "uncovered" would bury the routes that
+ * genuinely are.
+ * @param path a registered route path.
+ * @returns true when the path must not appear in the diagnostic.
+ */
+export function inherentlyCoveredPath(path) {
+    const bare = path.replace(/\*$/, '');
+    return (bare === '/api' ||
+        bare.startsWith('/api/') ||
+        bare === '/connect' ||
+        bare === '/plugins' ||
+        bare.startsWith('/plugins/'));
+}
+/**
  * Report the routes the plugin session does not cover.
  *
  * dsh's own admission gate covers `/api`, upgrades and the index; a route
@@ -617,16 +636,22 @@ function guardOtherRoutes(ctx, isPublicRoute) {
  * @param isPublicRoute paths the plugin itself owns.
  * @returns the uncovered paths (also logged).
  */
-function reportUncoveredRoutes(ctx, isPublicRoute) {
+export function reportUncoveredRoutes(ctx, isPublicRoute) {
     const tables = (ctx.webServer ?? {});
     const uncovered = [];
     for (const route of tables.exact?.values() ?? []) {
-        if (typeof route.path === 'string' && !isPublicRoute(route.path))
-            uncovered.push(route.path);
+        if (typeof route.path !== 'string')
+            continue;
+        if (isPublicRoute(route.path) || inherentlyCoveredPath(route.path))
+            continue;
+        uncovered.push(route.path);
     }
     for (const route of tables.prefixes?.values() ?? []) {
-        if (typeof route.path === 'string' && !isPublicRoute(route.path))
-            uncovered.push(`${route.path}*`);
+        if (typeof route.path !== 'string')
+            continue;
+        if (isPublicRoute(route.path) || inherentlyCoveredPath(route.path))
+            continue;
+        uncovered.push(`${route.path}*`);
     }
     if (uncovered.length > 0) {
         console.warn(`[reverse-proxy-fix] ${uncovered.length} webserver route(s) are outside the plugin session gate: ${uncovered.join(', ')}`);

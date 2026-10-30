@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { installConnectionAuth } from '../src/reverse-proxy-fix.js'
+import { inherentlyCoveredPath, installConnectionAuth } from '../src/reverse-proxy-fix.js'
 
 const SESSION = 'dsh_session=ok'
 const validate = (cookie) => cookie === SESSION
@@ -113,6 +113,18 @@ test('DSH_AUTH_REQUIRE_SESSION makes the plugin session the only credential', ()
     assert.equal(res.headers.Location, './_auth/login')
   } finally {
     delete process.env.DSH_AUTH_REQUIRE_SESSION
+  }
+})
+
+test('the route diagnostic ignores paths dsh already gates or serves publicly', () => {
+  // Covered by connection.admit / authorizeIndex / the launch-token exchange,
+  // or public build artifacts: none of these belong in the warning.
+  for (const path of ['/api', '/api/rpc', '/api*', '/connect', '/plugins', '/plugins/events']) {
+    assert.equal(inherentlyCoveredPath(path), true, path)
+  }
+  // A third-party plugin route is the audience of the warning.
+  for (const path of ['/open-in-app/open', '/im/webhook', '/pluginsx']) {
+    assert.equal(inherentlyCoveredPath(path), false, path)
   }
 })
 

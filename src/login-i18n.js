@@ -31,7 +31,28 @@ const MESSAGES = {
         passwordLabel: '密码',
         submitLabel: '登 录',
         wrongCredentials: '用户名或密码错误',
-        untrustedHost: (host) => `当前 Host（${host}）未被信任，请为该地址添加 --trusted-host 后重试`
+        untrustedHost: (host) => `当前 Host（${host}）未被信任，请为该地址添加 --trusted-host 后重试`,
+        lockedOut: (seconds) => `尝试次数过多，请 ${seconds} 秒后再试`,
+        sessionRequired: '登录已失效，请重新登录',
+        wrongPassword: '当前密码错误',
+        passwordRequired: '请填写当前密码和新密码',
+        passwordTooShort: (min) => `新密码至少 ${min} 个字符`,
+        requestRejected: '请求不被接受',
+        panel: {
+            label: '认证',
+            heading: '管理员认证',
+            intro: '修改登录本机 Web UI 的管理员密码。修改成功后，其他已登录的浏览器会被登出。',
+            usernameLabel: '当前用户名',
+            oldPasswordLabel: '当前密码',
+            newPasswordLabel: '新密码',
+            confirmPasswordLabel: '确认新密码',
+            submitLabel: '修改密码',
+            workingLabel: '正在提交…',
+            mismatch: '两次输入的新密码不一致',
+            changed: '密码已更新，其他浏览器已登出',
+            signOutLabel: '退出登录',
+            footnote: '忘记密码：在服务器上运行 `dsh --profile web auth-reset`。'
+        }
     },
     en: {
         tag: 'en',
@@ -41,7 +62,28 @@ const MESSAGES = {
         passwordLabel: 'Password',
         submitLabel: 'Sign in',
         wrongCredentials: 'Incorrect username or password',
-        untrustedHost: (host) => `Host ${host} is not trusted. Add --trusted-host for this address and retry.`
+        untrustedHost: (host) => `Host ${host} is not trusted. Add --trusted-host for this address and retry.`,
+        lockedOut: (seconds) => `Too many attempts. Try again in ${seconds} seconds.`,
+        sessionRequired: 'Your session has expired. Sign in again.',
+        wrongPassword: 'Current password is incorrect',
+        passwordRequired: 'Enter your current and new password',
+        passwordTooShort: (min) => `Password must be at least ${min} characters`,
+        requestRejected: 'Request rejected',
+        panel: {
+            label: 'Auth',
+            heading: 'Administrator sign-in',
+            intro: 'Change the password used to sign in to this Web UI. Changing it signs out every other browser.',
+            usernameLabel: 'Signed in as',
+            oldPasswordLabel: 'Current password',
+            newPasswordLabel: 'New password',
+            confirmPasswordLabel: 'Confirm new password',
+            submitLabel: 'Change password',
+            workingLabel: 'Saving…',
+            mismatch: 'The two new passwords do not match',
+            changed: 'Password updated. Other browsers are signed out.',
+            signOutLabel: 'Sign out',
+            footnote: 'Forgot it? Run `dsh --profile web auth-reset` on the server.'
+        }
     }
 };
 /** Copy for one locale. */

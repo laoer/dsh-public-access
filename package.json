@@ -1,12 +1,13 @@
 {
   "name": "@timgong/dsh-public-access",
-  "version": "2.2.0-beta",
-  "description": "DeepSeek Harness plugin - public/LAN access (0.0.0.0 + trusted hosts) with login auth, compatible with dsh 0.2.1-rc.2 (laoer fork)",
+  "version": "2.2.0-beta.2",
+  "description": "DeepSeek Harness plugin - public/LAN access (0.0.0.0 + trusted hosts) with password auth, scrypt credential store and settings-panel password change, compatible with dsh 0.2.1-rc.2 (laoer fork)",
   "type": "module",
   "main": "src/reverse-proxy-fix.js",
   "exports": {
     ".": "./src/reverse-proxy-fix.js",
-    "./web-startup": "./src/web-startup.js"
+    "./web-startup": "./src/web-startup.js",
+    "./client": "./src/client/index.js"
   },
   "files": [
     "src/",
@@ -41,7 +42,7 @@
     "url": "git+https://github.com/laoer/dsh-public-access.git"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.client.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test test/*.test.js",
     "check": "npm run typecheck && npm test",
@@ -66,6 +67,12 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
     }
   },
   "devDependencies": {

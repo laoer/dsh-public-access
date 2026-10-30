@@ -3,22 +3,21 @@ set -euo pipefail
 
 echo "=== DeepSeek Harness Public Access Mode ==="
 
-# Plugin auth (username/password) configuration. The dsh launch token printed
-# below is an alternative auth path; either logging in via the login page or
-# opening the token URL grants access.
-export DSH_AUTH_USER="${DSH_AUTH_USER:-admin}"
-export DSH_AUTH_PASS="${DSH_AUTH_PASS:-admin}"
-echo "Auth user: $DSH_AUTH_USER"
+# Authentication is owned by the plugin's credential file, NOT by environment
+# variables. On first start the plugin generates a random administrator
+# password, prints it, and saves it to:
+#     $DSH_HOME/dsh-public-access.initial-password   (default ~/.dsh/...)
+# Change it under Settings -> Auth (or `dsh --profile web auth-reset`); the file
+# is deleted automatically once you do. Do not set a default password here:
+# it would be readable by every local user through the process environment.
+if [ -n "${DSH_AUTH_PASS:-}" ]; then
+    echo "WARNING: DSH_AUTH_PASS is deprecated and only used to seed the credential" >&2
+    echo "         file on first start. Remove it and rotate the password in" >&2
+    echo "         Settings -> Auth instead." >&2
+fi
 
 HOST="${DSH_HOST:-0.0.0.0}"
 PORT="${DSH_PORT:-3080}"
-
-if [ "$HOST" = "0.0.0.0" ] || [ "$HOST" = "::" ]; then
-    if [ "$DSH_AUTH_USER" = "admin" ] && [ "$DSH_AUTH_PASS" = "admin" ]; then
-        echo "WARNING: exposing a wildcard bind with the default admin/admin password." >&2
-        echo "         Set DSH_AUTH_USER and DSH_AUTH_PASS before using this on a network." >&2
-    fi
-fi
 
 # Detect the public IP. NAT deployments still need this authority declared so
 # dsh's /api Host/Origin fence accepts requests addressed to the public IP;

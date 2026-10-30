@@ -91,6 +91,31 @@ test('legacy versions patch requestRejection instead of admit', () => {
   assert.equal(conn.requestRejection({ headers: {} }), 401)
 })
 
+test('DSH_AUTH_REQUIRE_SESSION makes the plugin session the only credential', () => {
+  process.env.DSH_AUTH_REQUIRE_SESSION = '1'
+  try {
+    const { conn, browserPeer, calls } = createConn()
+    installConnectionAuth(conn, { validateSession: validate })
+
+    // A session still works, and still short-circuits the native gate.
+    assert.deepEqual(conn.admit({ headers: { cookie: SESSION } }), { peer: browserPeer })
+    assert.equal(calls.admit, 0)
+
+    // Anything else is refused instead of falling through to the native
+    // 30-day cookie / launch token.
+    assert.deepEqual(conn.admit({ headers: {} }), { rejection: 401 })
+    assert.equal(calls.admit, 0, 'the native gate must not be consulted')
+
+    // The launch-token bootstrap no longer bypasses the login page.
+    const res = createRes()
+    assert.equal(conn.authorizeIndex({ headers: {}, url: '/?token=abc' }, res), false)
+    assert.equal(res.status, 302)
+    assert.equal(res.headers.Location, './_auth/login')
+  } finally {
+    delete process.env.DSH_AUTH_REQUIRE_SESSION
+  }
+})
+
 test('installConnectionAuth fails loudly on an unknown connection shape', () => {
   assert.throws(() => installConnectionAuth(undefined), /auth gate not found/)
   assert.throws(

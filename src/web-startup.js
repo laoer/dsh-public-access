@@ -1,5 +1,8 @@
 import { Command } from 'commander';
+import { execSync } from 'node:child_process';
+import { createInterface } from 'node:readline';
 import { parsePublicUrl } from './public-url.js';
+import { MIN_PASSWORD_LENGTH, resetCredentials } from './credentials.js';
 import { ensureWildcardBindSupport, lanHosts, normalizeBindHost, supportsTlsConfig } from './webserver-schema.js';
 export const name = 'web-startup';
 export const inject = ['cmdlineArgs'];
@@ -19,6 +22,76 @@ function isCommanderError(error) {
     return (typeof candidate.code === 'string' &&
         candidate.code.startsWith('commander.') &&
         typeof candidate.exitCode === 'number');
+}
+/**
+ * Prompt for a password with echo suppressed on a POSIX TTY.
+ * @param question prompt text.
+ * @returns the entered line.
+ */
+function promptHiddenPassword(question) {
+    process.stdout.write(question);
+    let muted = false;
+    try {
+        execSync('stty -echo', { stdio: 'ignore' });
+        muted = true;
+    }
+    catch {
+        process.stdout.write('(input is not a terminal; the password will be echoed)\n');
+    }
+    return new Promise((resolve) => {
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        rl.on('line', (line) => {
+            if (muted) {
+                try {
+                    execSync('stty echo', { stdio: 'ignore' });
+                }
+                catch {
+                    // stdin vanished; nothing to restore
+                }
+                process.stdout.write('\n');
+            }
+            rl.close();
+            resolve(line);
+        });
+    });
+}
+/**
+ * Prompt twice and require both entries to match.
+ * @returns the new password.
+ */
+async function promptNewPassword() {
+    const first = await promptHiddenPassword('New password: ');
+    const second = await promptHiddenPassword('Repeat new password: ');
+    if (first !== second)
+        throw new Error('the two passwords do not match');
+    return first;
+}
+/**
+ * Recover from a forgotten password, or rename the administrator.
+ *
+ * Every successful call rotates the session signing secret, so all previously
+ * issued cookies — including one an attacker may hold — die at once.
+ * @param options `--password` / `--username` values.
+ * @returns a human-readable confirmation.
+ */
+export async function runAuthReset(options) {
+    let password = options.password;
+    if (password === undefined && options.username === undefined) {
+        password = await promptNewPassword();
+    }
+    if (password !== undefined && password.length < MIN_PASSWORD_LENGTH) {
+        throw new Error(`password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    }
+    const result = resetCredentials({
+        ...(options.username !== undefined ? { username: options.username } : {}),
+        ...(password !== undefined ? { password } : {})
+    });
+    const parts = [];
+    if (result.usernameChanged)
+        parts.push(`username is now "${result.username}"`);
+    if (result.passwordChanged)
+        parts.push('password updated');
+    return `${parts.join(', ') || 'no change'}; every existing session has been signed out`;
 }
 function webCommand() {
     return new Command()
@@ -43,6 +116,8 @@ Examples:
                                              advertise a prefix-stripping HTTPS proxy entry
   dsh --profile web --tls-cert ./server-chain.pem --tls-key ./server-key.pem
                                              serve HTTPS with an existing certificate and key
+  dsh --profile web auth-reset               reset the administrator password (signs out every session)
+  dsh --profile web auth-reset --username alice   rename the administrator
 `);
 }
 export function apply(ctx) {
@@ -62,13 +137,13 @@ export function apply(ctx) {
                 program.error(`error: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
-        // dsh 0.2.1 rejects wildcard binds in the webserver config schema. The
-        // stock CLI rejects them too; our replacement exists precisely to opt in
-        // to a wildcard bind, so widen the boot-path schema before providing the
-        // value the `webserver` row validates.
-        const wildcard = host === '0.0.0.0' || host === '::';
-        if (wildcard && !ensureWildcardBindSupport(ctx.baseUrl)) {
-            program.error(`error: --host ${host} needs the webserver host schema widened, which is not available on this dsh build; upgrade dsh, or bind one concrete local IP / use a reverse proxy`);
+        // dsh 0.2.1 rejects wildcard binds in the webserver config schema, and
+        // IPv6 / concrete literals are only accepted through the widened member.
+        // The stock CLI rejects them too; our replacement exists precisely to opt
+        // in, so widen the boot-path schema before providing the value the
+        // `webserver` row validates.
+        if (host !== undefined && host !== '127.0.0.1' && !ensureWildcardBindSupport(ctx.baseUrl)) {
+            program.error(`error: --host ${host} needs the webserver host schema widened, which is not available on this dsh build; upgrade dsh, or bind 127.0.0.1 / use a reverse proxy`);
         }
         let tls;
         if (options.tlsCert !== undefined && options.tlsKey !== undefined) {
@@ -105,6 +180,25 @@ export function apply(ctx) {
             ...(tls !== undefined ? { tls } : {}),
             trustedHosts
         });
+    });
+    // `dsh --profile web auth-reset` — the documented recovery path for a
+    // forgotten password, and the only way to change the administrator name.
+    program
+        .command('auth-reset')
+        .description('reset the administrator password and/or username; signs out every session')
+        .option('--password <password>', 'new password (omit for a hidden interactive prompt)')
+        .option('--username <username>', 'new username (omit to keep the current one)')
+        .action(async (options) => {
+        const exit = ctx.get('appExit');
+        try {
+            const message = await runAuthReset(options);
+            process.stdout.write(`${message}\n`);
+            exit?.(0);
+        }
+        catch (error) {
+            process.stderr.write(`error: ${error instanceof Error ? error.message : String(error)}\n`);
+            exit?.(1);
+        }
     });
     const args = ctx.get('cmdlineArgs');
     const exit = ctx.get('appExit');

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { createHash, createHmac } from 'node:crypto'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { before, test } from 'node:test'
 import {
   createSession,
@@ -12,6 +14,7 @@ import {
   validateLogin,
   validateSession
 } from '../src/auth.js'
+import { ensureCredentials } from '../src/credentials.js'
 import {
   INDEX_LOGIN_LOCATION,
   LOGIN_SUCCESS_LOCATION,
@@ -21,9 +24,15 @@ import {
 const HOUR = 60 * 60 * 1000
 
 before(() => {
+  // An isolated home: the credential store must not touch the real ~/.dsh.
+  process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'dsh-public-access-test-'))
   process.env.DSH_AUTH_USER = 'admin'
   process.env.DSH_AUTH_PASS = 'secret'
-  process.env.DSH_AUTH_SALT = 'test-salt'
+  delete process.env.DSH_AUTH_SALT
+  delete process.env.DSH_AUTH_FILE
+  // Seeding from the environment is exactly the upgrade path a deployed
+  // instance takes, so the tests exercise it instead of a private back door.
+  ensureCredentials()
 })
 
 test('createSession / validateSession round-trip', () => {
@@ -113,7 +122,6 @@ test('sessions carry their issue time and idle expiry', () => {
 
   const info = inspectSession(`dsh_session=${value}`, now)
   assert.ok(info)
-  assert.equal(info.legacy, false)
   assert.equal(info.issuedAt, now)
   assert.equal(info.expiresAt, now + 24 * HOUR)
   assert.equal(info.remaining, 24 * HOUR)
@@ -169,27 +177,13 @@ test('the absolute cap stops renewal even for an active session', () => {
   }
 })
 
-test('legacy 2-part tokens still work and renew into v2 tokens', () => {
+test('tokens from the old signing scheme are rejected, not reinterpreted', () => {
   const now = Date.now()
   const expiresAt = now + 12 * HOUR
-  // Reproduce the pre-sliding token exactly as the old build signed it.
-  const password = createHash('sha256').update(`test-salt${'secret'}`).digest('hex')
-  const signature = createHmac('sha256', `${password}:test-salt`)
-    .update(String(expiresAt))
-    .digest('hex')
-
-  const cookie = `dsh_session=${expiresAt}.${signature}`
-  assert.equal(validateSession(cookie), true)
-
-  const info = inspectSession(cookie, now)
-  assert.ok(info)
-  assert.equal(info.legacy, true)
-  assert.equal(info.issuedAt, expiresAt - 24 * HOUR)
-
-  const renewed = renewSession(info, now)
-  assert.ok(renewed)
-  assert.equal(renewed.value.split('.').length, 3)
-  assert.equal(validateSession(`dsh_session=${renewed.value}`), true)
+  // The pre-2.2.1 build derived the secret from the password hash; that shape
+  // must now fail instead of authenticating anyone.
+  const signature = 'a'.repeat(64)
+  assert.equal(validateSession(`dsh_session=${expiresAt}.${signature}`), false)
 })
 
 test('issueSession reports the expiry it stamped, cap included', () => {

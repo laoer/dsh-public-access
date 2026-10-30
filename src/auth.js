@@ -1,10 +1,12 @@
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { DEFAULT_LOCALE, LANGUAGE_NAMES, LOCALES, loginMessages } from './login-i18n.js';
+import { getSessionSecret, verifyCredentials } from './credentials.js';
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
-// Domain separation: a v2 signature must never be replayable as a legacy one.
-const SIGNATURE_DOMAIN = 'dsh-session-v2|';
+// Domain separation: a session signature must never be replayable as another
+// kind of signature the plugin or a future version might produce.
+const SIGNATURE_DOMAIN = 'dsh-session-v3|';
 function envNumber(name) {
     const raw = process.env[name];
     if (raw === undefined || raw.trim() === '')
@@ -35,32 +37,18 @@ export function getSessionPolicy() {
         renew: Math.min(renewMinutes * MINUTE, idle)
     };
 }
-// Hash password with salt
-function hashPassword(password, salt) {
-    return createHash('sha256').update(salt + password).digest('hex');
-}
-// Get credentials from environment or config
-function getCredentials() {
-    const username = process.env.DSH_AUTH_USER || 'admin';
-    const password = process.env.DSH_AUTH_PASS || 'admin';
-    const salt = process.env.DSH_AUTH_SALT || 'dsh-reverse-proxy-salt';
-    return { username, password: hashPassword(password, salt), salt };
-}
-function getSessionSecret() {
-    const creds = getCredentials();
-    return `${creds.password}:${creds.salt}`;
+// Credentials live in the store; the session secret is a random key persisted
+// beside them, so a restart keeps sessions alive while a password change
+// invalidates every one of them.
+function signPayload(payload) {
+    return createHmac('sha256', getSessionSecret()).update(SIGNATURE_DOMAIN + payload).digest('hex');
 }
 // The cookie name is matched only at the start of the header or after a `;`,
 // so a similarly named foreign cookie (`foo_dsh_session`) cannot satisfy it.
 const SESSION_COOKIE_PATTERN = /(?:^|;\s*)dsh_session=([^;]*)/;
-function signPayload(payload) {
-    return createHmac('sha256', getSessionSecret()).update(SIGNATURE_DOMAIN + payload).digest('hex');
-}
-// Legacy 2-part token: HMAC over the expiry alone. Accepted so an upgrade
-// does not log everyone out; the next renewal turns it into a v2 token.
-function signLegacy(expiresAt) {
-    return createHmac('sha256', getSessionSecret()).update(String(expiresAt)).digest('hex');
-}
+// Legacy 2-part tokens are gone: they were signed with a secret derived from
+// the password hash, and the store now owns a random secret, so no pre-2.2.1
+// cookie can verify anyway. The upgrade logs every browser out exactly once.
 function signatureMatches(expectedHex, actualHex) {
     const expected = Buffer.from(expectedHex, 'hex');
     const actual = Buffer.from(actualHex, 'hex');
@@ -95,33 +83,19 @@ export function inspectSession(cookieHeader, now = Date.now()) {
     if (value === undefined)
         return undefined;
     const parts = value.split('.');
-    if (parts.length === 3) {
-        const issuedAt = Number(parts[0]);
-        const expiresAt = Number(parts[1]);
-        if (!Number.isSafeInteger(issuedAt) || !Number.isSafeInteger(expiresAt))
-            return undefined;
-        if (issuedAt <= 0 || expiresAt <= issuedAt)
-            return undefined;
-        if (!signatureMatches(signPayload(`${issuedAt}.${expiresAt}`), parts[2]))
-            return undefined;
-        if (now > expiresAt)
-            return undefined;
-        return { issuedAt, expiresAt, remaining: expiresAt - now, legacy: false };
-    }
-    if (parts.length === 2) {
-        const expiresAt = Number(parts[0]);
-        if (!Number.isSafeInteger(expiresAt) || expiresAt <= 0)
-            return undefined;
-        if (!signatureMatches(signLegacy(expiresAt), parts[1]))
-            return undefined;
-        if (now > expiresAt)
-            return undefined;
-        // A 2-part token carries no issue time: assume it was minted a full idle
-        // window before it expires, but never claim it was issued in the future.
-        const issuedAt = Math.min(expiresAt - getSessionPolicy().idle, now);
-        return { issuedAt, expiresAt, remaining: expiresAt - now, legacy: true };
-    }
-    return undefined;
+    if (parts.length !== 3)
+        return undefined;
+    const issuedAt = Number(parts[0]);
+    const expiresAt = Number(parts[1]);
+    if (!Number.isSafeInteger(issuedAt) || !Number.isSafeInteger(expiresAt))
+        return undefined;
+    if (issuedAt <= 0 || expiresAt <= issuedAt)
+        return undefined;
+    if (!signatureMatches(signPayload(`${issuedAt}.${expiresAt}`), parts[2]))
+        return undefined;
+    if (now > expiresAt)
+        return undefined;
+    return { issuedAt, expiresAt, remaining: expiresAt - now };
 }
 /**
  * Validate the plugin session cookie.
@@ -174,22 +148,16 @@ export function renewSession(info, now = Date.now()) {
     return { value: tokenFor(info.issuedAt, expiresAt), expiresAt };
 }
 /**
- * Validate username/password against the environment credentials. Both
- * comparisons use fixed-length byte buffers so a mismatch does not leak
- * length or prefix information through timing.
+ * Validate a username/password pair against the credential store.
+ *
+ * Both comparisons are constant-time; the password check runs even when the
+ * username is wrong, so the response time does not reveal which field missed.
  * @param username submitted username.
  * @param password submitted plaintext password.
  * @returns true when both match.
  */
 export function validateLogin(username, password) {
-    const creds = getCredentials();
-    const expectedUser = Buffer.from(creds.username);
-    const actualUser = Buffer.from(username);
-    const expectedPass = Buffer.from(creds.password, 'hex');
-    const actualPass = Buffer.from(hashPassword(password, creds.salt), 'hex');
-    const userOk = expectedUser.length === actualUser.length && timingSafeEqual(expectedUser, actualUser);
-    const passOk = expectedPass.length === actualPass.length && timingSafeEqual(expectedPass, actualPass);
-    return userOk && passOk;
+    return verifyCredentials(username, password);
 }
 /**
  * Escape text placed into the login page's HTML. Error messages can include

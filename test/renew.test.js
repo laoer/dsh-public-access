@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import { before, test } from 'node:test'
 import { createSession, validateSession } from '../src/auth.js'
+import { ensureCredentials } from '../src/credentials.js'
 import { apply } from '../src/reverse-proxy-fix.js'
+import { useTempHome } from './helpers.js'
 
 const routes = new Map()
 const injectionHooks = []
@@ -59,9 +61,11 @@ function dueSession() {
 }
 
 before(() => {
+  useTempHome()
   process.env.DSH_AUTH_USER = 'admin'
   process.env.DSH_AUTH_PASS = 'secret'
-  process.env.DSH_AUTH_SALT = 'test-salt'
+  delete process.env.DSH_AUTH_SALT
+  ensureCredentials()
   conn = createConnection()
   apply(createCtx())
 })

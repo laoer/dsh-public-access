@@ -5,5 +5,8 @@
     "noEmitOnError": true,
     "declaration": false,
     "sourceMap": false
-  }
+  },
+  "exclude": [
+    "src/client/**"
+  ]
 }

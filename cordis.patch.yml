@@ -10,6 +10,9 @@
 - id: web-startup
   disabled: true
 
+# The second row is the package root: the host half supplies the auth routes,
+# and the same row is what the client-module registry reads to load the
+# browser half (dsh.client) that renders Settings -> Auth.
 - insert:
     - id: public-access-web-startup
       name: '@timgong/dsh-public-access/web-startup'

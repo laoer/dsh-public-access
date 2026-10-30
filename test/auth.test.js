@@ -1,11 +1,24 @@
 import assert from 'node:assert/strict'
+import { createHash, createHmac } from 'node:crypto'
 import { before, test } from 'node:test'
-import { createSession, escapeHtml, getLoginPage, validateLogin, validateSession } from '../src/auth.js'
+import {
+  createSession,
+  escapeHtml,
+  getLoginPage,
+  getSessionPolicy,
+  inspectSession,
+  issueSession,
+  renewSession,
+  validateLogin,
+  validateSession
+} from '../src/auth.js'
 import {
   INDEX_LOGIN_LOCATION,
   LOGIN_SUCCESS_LOCATION,
   LOGOUT_LOCATION
 } from '../src/reverse-proxy-fix.js'
+
+const HOUR = 60 * 60 * 1000
 
 before(() => {
   process.env.DSH_AUTH_USER = 'admin'
@@ -61,7 +74,145 @@ test('auth relative URLs resolve at root and under a prefix', () => {
 
 test('escapeHtml keeps request-controlled error text inert', () => {
   assert.equal(escapeHtml('<script>"x"&</script>'), '&lt;script&gt;&quot;x&quot;&amp;&lt;/script&gt;')
-  const html = getLoginPage('<script>alert(1)</script>')
+  const html = getLoginPage('zh-CN', '<script>alert(1)</script>')
   assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/)
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/)
+})
+
+test('the login page speaks Chinese by default and English on request', () => {
+  const zh = getLoginPage()
+  assert.match(zh, /<html lang="zh-CN">/)
+  assert.match(zh, /请登录以继续/)
+  assert.match(zh, /<label>用户名<\/label>/)
+  assert.match(zh, /<label>密码<\/label>/)
+
+  const en = getLoginPage('en')
+  assert.match(en, /<html lang="en">/)
+  assert.match(en, /Sign in to continue/)
+  assert.match(en, /<label>Username<\/label>/)
+  assert.match(en, /<label>Password<\/label>/)
+  assert.match(en, />Sign in<\/button>/)
+  assert.doesNotMatch(en, /请登录/)
+})
+
+test('the language switcher links to the other locale only', () => {
+  const zh = getLoginPage('zh-CN')
+  assert.match(zh, /href="\?lang=en"/)
+  assert.doesNotMatch(zh, /href="\?lang=zh-CN"/)
+  assert.match(zh, /aria-current="true">中文<\/span>/)
+
+  const en = getLoginPage('en')
+  assert.match(en, /href="\?lang=zh-CN"/)
+  assert.match(en, /aria-current="true">English<\/span>/)
+})
+
+test('sessions carry their issue time and idle expiry', () => {
+  const now = Date.now()
+  const value = createSession(now)
+  assert.equal(value.split('.').length, 3)
+
+  const info = inspectSession(`dsh_session=${value}`, now)
+  assert.ok(info)
+  assert.equal(info.legacy, false)
+  assert.equal(info.issuedAt, now)
+  assert.equal(info.expiresAt, now + 24 * HOUR)
+  assert.equal(info.remaining, 24 * HOUR)
+})
+
+test('tampering with either timestamp breaks the signature', () => {
+  const now = Date.now()
+  const [issuedAt, expiresAt, signature] = createSession(now).split('.')
+  const shifted = `${issuedAt}.${Number(expiresAt) + HOUR}.${signature}`
+  assert.equal(validateSession(`dsh_session=${shifted}`), false)
+  const swapped = `${expiresAt}.${issuedAt}.${signature}`
+  assert.equal(validateSession(`dsh_session=${swapped}`), false)
+})
+
+test('renewal slides the expiry but no more than once per step', () => {
+  const now = Date.now()
+  const info = inspectSession(`dsh_session=${createSession(now)}`)
+  assert.ok(info)
+
+  // Within the 5-minute step nothing is reissued, so a busy tab is silent.
+  assert.equal(renewSession(info, now + 60 * 1000), undefined)
+
+  const renewed = renewSession(info, now + 10 * 60 * 1000)
+  assert.ok(renewed)
+  assert.equal(renewed.expiresAt, now + 10 * 60 * 1000 + 24 * HOUR)
+  assert.equal(validateSession(`dsh_session=${renewed.value}`), true)
+
+  // The renewed token keeps the original login time, so the cap still holds.
+  const renewedInfo = inspectSession(`dsh_session=${renewed.value}`, now + 10 * 60 * 1000)
+  assert.equal(renewedInfo.issuedAt, now)
+
+  // And the throttle restarts from the renewal, not from the login.
+  assert.equal(renewSession(renewedInfo, now + 11 * 60 * 1000), undefined)
+  assert.ok(renewSession(renewedInfo, now + 16 * 60 * 1000))
+})
+
+test('the absolute cap stops renewal even for an active session', () => {
+  const previous = process.env.DSH_AUTH_MAX_DAYS
+  // 0.02 day = 28.8 minutes, so a 24h idle window can never be reached.
+  process.env.DSH_AUTH_MAX_DAYS = '0.02'
+  try {
+    const now = Date.now()
+    const issued = now - 20 * 60 * 1000
+    const info = inspectSession(`dsh_session=${createSession(issued)}`, now)
+    assert.ok(info)
+    assert.equal(info.expiresAt, issued + 0.02 * 24 * HOUR)
+
+    // A renewal may only reach the cap, i.e. the expiry it already has.
+    assert.equal(renewSession(info, now + 6 * 60 * 1000), undefined)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_AUTH_MAX_DAYS
+    else process.env.DSH_AUTH_MAX_DAYS = previous
+  }
+})
+
+test('legacy 2-part tokens still work and renew into v2 tokens', () => {
+  const now = Date.now()
+  const expiresAt = now + 12 * HOUR
+  // Reproduce the pre-sliding token exactly as the old build signed it.
+  const password = createHash('sha256').update(`test-salt${'secret'}`).digest('hex')
+  const signature = createHmac('sha256', `${password}:test-salt`)
+    .update(String(expiresAt))
+    .digest('hex')
+
+  const cookie = `dsh_session=${expiresAt}.${signature}`
+  assert.equal(validateSession(cookie), true)
+
+  const info = inspectSession(cookie, now)
+  assert.ok(info)
+  assert.equal(info.legacy, true)
+  assert.equal(info.issuedAt, expiresAt - 24 * HOUR)
+
+  const renewed = renewSession(info, now)
+  assert.ok(renewed)
+  assert.equal(renewed.value.split('.').length, 3)
+  assert.equal(validateSession(`dsh_session=${renewed.value}`), true)
+})
+
+test('issueSession reports the expiry it stamped, cap included', () => {
+  const previous = process.env.DSH_AUTH_MAX_DAYS
+  process.env.DSH_AUTH_MAX_DAYS = '0.02'
+  try {
+    const now = Date.now()
+    const session = issueSession(now)
+    assert.equal(session.expiresAt, now + 0.02 * 24 * HOUR)
+    assert.equal(inspectSession(`dsh_session=${session.value}`, now).expiresAt, session.expiresAt)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_AUTH_MAX_DAYS
+    else process.env.DSH_AUTH_MAX_DAYS = previous
+  }
+})
+
+test('the policy rejects a malformed override instead of silently defaulting', () => {
+  const previous = process.env.DSH_AUTH_IDLE_HOURS
+  process.env.DSH_AUTH_IDLE_HOURS = 'soon'
+  try {
+    assert.throws(() => getSessionPolicy(), /DSH_AUTH_IDLE_HOURS/)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_AUTH_IDLE_HOURS
+    else process.env.DSH_AUTH_IDLE_HOURS = previous
+  }
 })

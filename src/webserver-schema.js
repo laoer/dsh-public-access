@@ -1,8 +1,7 @@
-import { isIPv4, isIPv6 } from 'node:net'
-import { networkInterfaces } from 'node:os'
-import { createRequire } from 'node:module'
-import z from '@deepseek-ai/schemastery'
-
+import { isIPv4, isIPv6 } from 'node:net';
+import { networkInterfaces } from 'node:os';
+import { createRequire } from 'node:module';
+import z from '@deepseek-ai/schemastery';
 /**
  * dsh 0.2.1 rejects wildcard bind addresses inside
  * `@deepseek-ai/dsh-host-webserver`'s config schema, not only in its CLI.
@@ -20,25 +19,22 @@ import z from '@deepseek-ai/schemastery'
  * boot, so {@link bootWebServer} resolves the package from the profile root
  * that `ctx.baseUrl` names.
  */
-
 /** Package whose webserver schema the boot path validates against. */
-const WEBSERVER_PACKAGE = '@deepseek-ai/dsh-host-webserver'
-
+const WEBSERVER_PACKAGE = '@deepseek-ai/dsh-host-webserver';
 /** Marks a `host` schema member as already widened (idempotency per schema). */
-const WIDENED = Symbol.for('dsh-public-access.host-widened')
-
+const WIDENED = Symbol.for('dsh-public-access.host-widened');
 /** Success is sticky; failures retry on the next call. */
-let wildcardSupported = false
-
+let wildcardSupported = false;
 /**
  * Whether a schema member already carries our widening.
  * @param value candidate schema member.
  * @returns true when the member is the union we installed.
  */
 function isWidenedMember(value) {
-  return typeof value === 'function' && Reflect.get(value, WIDENED) === true
+    if (typeof value !== 'function')
+        return false;
+    return Reflect.get(value, WIDENED) === true;
 }
-
 /**
  * Replace the `host` member of a schemastery object schema with a union that
  * accepts IPv4/IPv6 literals — including the wildcard binds the stock 0.2.1
@@ -48,41 +44,40 @@ function isWidenedMember(value) {
  * @returns whether the schema now accepts the extended host domain.
  */
 export function widenHostMember(schema) {
-  const dict = schema?.dict
-  const host = dict?.host
-  if (isWidenedMember(host)) return true
-  if (
-    dict === undefined ||
-    typeof host !== 'function' ||
-    typeof z.union !== 'function' ||
-    typeof z.transform !== 'function' ||
-    typeof z.ValidationError !== 'function'
-  ) {
-    return false
-  }
-  try {
-    const widened = z.union([
-      host,
-      z.transform(z.string(), (value, options) => {
-        if (!isIPv4(value) && !isIPv6(value)) {
-          throw new z.ValidationError('expected an IPv4 or IPv6 literal', options)
-        }
-        return value
-      })
-    ])
-    // A fresh union's meta is empty. The stock host member is `.required()`,
-    // and a default-less non-required member lets a host-less config validate
-    // (which would make listen(port, undefined) bind every interface).
-    const meta = Reflect.get(host, 'meta')
-    Reflect.set(widened, 'meta', meta !== null && typeof meta === 'object' ? { ...meta } : {})
-    Reflect.set(widened, WIDENED, true)
-    dict.host = widened
-    return true
-  } catch {
-    return false
-  }
+    const dict = schema.dict;
+    const host = dict?.host;
+    if (isWidenedMember(host))
+        return true;
+    if (dict === undefined ||
+        typeof host !== 'function' ||
+        typeof z.union !== 'function' ||
+        typeof z.transform !== 'function' ||
+        typeof z.ValidationError !== 'function') {
+        return false;
+    }
+    try {
+        const widened = z.union([
+            host,
+            z.transform(z.string(), (value, options) => {
+                if (!isIPv4(value) && !isIPv6(value)) {
+                    throw new z.ValidationError('expected an IPv4 or IPv6 literal', options);
+                }
+                return value;
+            })
+        ]);
+        // A fresh union's meta is empty. The stock host member is `.required()`,
+        // and a default-less non-required member lets a host-less config validate
+        // (which would make listen(port, undefined) bind every interface).
+        const meta = Reflect.get(host, 'meta');
+        Reflect.set(widened, 'meta', meta !== null && typeof meta === 'object' ? { ...meta } : {});
+        Reflect.set(widened, WIDENED, true);
+        dict.host = widened;
+        return true;
+    }
+    catch {
+        return false;
+    }
 }
-
 /**
  * The webserver module instance the boot path validates configs against.
  *
@@ -94,19 +89,20 @@ export function widenHostMember(schema) {
  * @returns the boot-path module, or undefined when it cannot be resolved.
  */
 function bootWebServer(baseUrl) {
-  if (baseUrl === undefined || baseUrl === null) return undefined
-  try {
-    const base = String(baseUrl)
-    const anchor = base.endsWith('/') ? base : `${base}/`
-    const require = createRequire(new URL('node_modules/.host-schema.cjs', anchor))
-    const entry = require.resolve(WEBSERVER_PACKAGE)
-    const loaded = require(entry)
-    return loaded?.WebServer ?? loaded?.default?.WebServer ?? (typeof loaded === 'function' ? loaded : undefined)
-  } catch {
-    return undefined
-  }
+    if (baseUrl === undefined || baseUrl === null)
+        return undefined;
+    try {
+        const base = String(baseUrl);
+        const anchor = base.endsWith('/') ? base : `${base}/`;
+        const require = createRequire(new URL('node_modules/.host-schema.cjs', anchor));
+        const entry = require.resolve(WEBSERVER_PACKAGE);
+        const loaded = require(entry);
+        return loaded?.WebServer ?? loaded?.default?.WebServer ?? (typeof loaded === 'function' ? loaded : undefined);
+    }
+    catch {
+        return undefined;
+    }
 }
-
 /**
  * Widen the boot-path webserver's `host` schema to accept wildcard and
  * literal binds. Safe to call repeatedly; never throws.
@@ -114,13 +110,14 @@ function bootWebServer(baseUrl) {
  * @returns whether an extended `--host` value will validate at boot.
  */
 export function ensureWildcardBindSupport(baseUrl) {
-  if (wildcardSupported) return true
-  const target = bootWebServer(baseUrl)
-  const widened = target?.Config !== undefined ? widenHostMember(target.Config) : false
-  if (widened) wildcardSupported = true
-  return widened
+    if (wildcardSupported)
+        return true;
+    const target = bootWebServer(baseUrl);
+    const widened = target?.Config !== undefined ? widenHostMember(target.Config) : false;
+    if (widened)
+        wildcardSupported = true;
+    return widened;
 }
-
 /**
  * Whether the boot-path webserver config declares the 0.2.1 `tls` field.
  * TLS and `--public-url` shipped in the same upstream line, so this one probe
@@ -130,10 +127,9 @@ export function ensureWildcardBindSupport(baseUrl) {
  * @returns true when the boot-path schema has a `tls` member.
  */
 export function supportsTlsConfig(baseUrl) {
-  const dict = bootWebServer(baseUrl)?.Config?.dict
-  return dict !== undefined && 'tls' in dict
+    const dict = bootWebServer(baseUrl)?.Config?.dict;
+    return dict !== undefined && 'tls' in dict;
 }
-
 /**
  * Canonical bare IPv6 literal for `value` (WHATWG normalization), or
  * `undefined` when the value is not an IPv6 literal the parser accepts.
@@ -144,15 +140,16 @@ export function supportsTlsConfig(baseUrl) {
  * @returns the canonical bare literal, or undefined.
  */
 export function canonicalIpv6(value) {
-  const literal = value.startsWith('[') && value.endsWith(']') ? value.slice(1, -1) : value
-  if (!isIPv6(literal)) return undefined
-  try {
-    return new URL(`http://[${literal}]`).hostname.slice(1, -1)
-  } catch {
-    return undefined
-  }
+    const literal = value.startsWith('[') && value.endsWith(']') ? value.slice(1, -1) : value;
+    if (!isIPv6(literal))
+        return undefined;
+    try {
+        return new URL(`http://[${literal}]`).hostname.slice(1, -1);
+    }
+    catch {
+        return undefined;
+    }
 }
-
 /**
  * Whether a canonical IPv6 literal is IPv4-mapped. Node binds such a literal
  * as AF_INET, so clients arrive with a plain IPv4 `Host` that a bracketed
@@ -161,9 +158,8 @@ export function canonicalIpv6(value) {
  * @returns true for `::ffff:...`.
  */
 function isIpv4Mapped(canonical) {
-  return canonical.startsWith('::ffff:')
+    return canonical.startsWith('::ffff:');
 }
-
 /**
  * Normalize and validate a `--host` value.
  *
@@ -176,24 +172,22 @@ function isIpv4Mapped(canonical) {
  * @throws when the value is not a supported binding host.
  */
 export function normalizeBindHost(value) {
-  const host = value.startsWith('[') && value.endsWith(']') ? value.slice(1, -1) : value
-  if (host === '127.0.0.1' || host === '0.0.0.0') return host
-  if (host.includes('%')) {
-    throw new Error(`--host does not accept an interface zone id: ${JSON.stringify(value)}`)
-  }
-  if (isIPv4(host)) return host
-  const canonical = canonicalIpv6(host)
-  if (canonical !== undefined && !isIpv4Mapped(canonical)) return canonical
-  if (canonical !== undefined) {
-    throw new Error(
-      `--host does not accept an IPv4-mapped IPv6 address (${JSON.stringify(value)}); use the equivalent IPv4 literal`
-    )
-  }
-  throw new Error(
-    `--host must be an IP literal: 127.0.0.1, 0.0.0.0, a concrete IPv4 address, or an IPv6 address without a zone (got ${JSON.stringify(value)})`
-  )
+    const host = value.startsWith('[') && value.endsWith(']') ? value.slice(1, -1) : value;
+    if (host === '127.0.0.1' || host === '0.0.0.0')
+        return host;
+    if (host.includes('%')) {
+        throw new Error(`--host does not accept an interface zone id: ${JSON.stringify(value)}`);
+    }
+    if (isIPv4(host))
+        return host;
+    const canonical = canonicalIpv6(host);
+    if (canonical !== undefined && !isIpv4Mapped(canonical))
+        return canonical;
+    if (canonical !== undefined) {
+        throw new Error(`--host does not accept an IPv4-mapped IPv6 address (${JSON.stringify(value)}); use the equivalent IPv4 literal`);
+    }
+    throw new Error(`--host must be an IP literal: 127.0.0.1, 0.0.0.0, a concrete IPv4 address, or an IPv6 address without a zone (got ${JSON.stringify(value)})`);
 }
-
 /**
  * Fence authorities the stock 0.2.1 trust derivation no longer produces for a
  * wildcard bind. The list mirrors the surface the socket actually serves:
@@ -205,19 +199,23 @@ export function normalizeBindHost(value) {
  * @returns fence authorities to append; always canonical and port-less.
  */
 export function lanHosts(bindHost, interfaces = networkInterfaces()) {
-  if (bindHost === undefined) return []
-  const bare = bindHost.startsWith('[') && bindHost.endsWith(']') ? bindHost.slice(1, -1) : bindHost
-  if (bare === '127.0.0.1') return []
-  if (isIPv4(bare)) {
-    if (bare !== '0.0.0.0') return [bare]
-    return interfaceHosts(false, interfaces)
-  }
-  const canonical = canonicalIpv6(bare.split('%')[0])
-  if (canonical === undefined) return []
-  if (canonical !== '::') return [`[${canonical}]`]
-  return interfaceHosts(true, interfaces)
+    if (bindHost === undefined)
+        return [];
+    const bare = bindHost.startsWith('[') && bindHost.endsWith(']') ? bindHost.slice(1, -1) : bindHost;
+    if (bare === '127.0.0.1')
+        return [];
+    if (isIPv4(bare)) {
+        if (bare !== '0.0.0.0')
+            return [bare];
+        return interfaceHosts(false, interfaces);
+    }
+    const canonical = canonicalIpv6(bare.split('%')[0]);
+    if (canonical === undefined)
+        return [];
+    if (canonical !== '::')
+        return [`[${canonical}]`];
+    return interfaceHosts(true, interfaces);
 }
-
 /**
  * Non-internal interface addresses of this host, in enumeration order.
  * An enumeration failure must not kill the connection row's activation, so it
@@ -227,23 +225,26 @@ export function lanHosts(bindHost, interfaces = networkInterfaces()) {
  * @returns canonical, deduplicated authorities.
  */
 function interfaceHosts(includeIpv6, interfaces) {
-  try {
-    const hosts = []
-    for (const list of Object.values(interfaces)) {
-      for (const iface of list ?? []) {
-        if (iface.internal) continue
-        if (includeIpv6) {
-          const address = canonicalIpv6(iface.address.split('%')[0])
-          if (address !== undefined) {
-            hosts.push(`[${address}]`)
-            continue
-          }
+    try {
+        const hosts = [];
+        for (const list of Object.values(interfaces)) {
+            for (const iface of list ?? []) {
+                if (iface.internal)
+                    continue;
+                if (includeIpv6) {
+                    const address = canonicalIpv6(iface.address.split('%')[0]);
+                    if (address !== undefined) {
+                        hosts.push(`[${address}]`);
+                        continue;
+                    }
+                }
+                if (iface.family === 'IPv4')
+                    hosts.push(iface.address);
+            }
         }
-        if (iface.family === 'IPv4') hosts.push(iface.address)
-      }
+        return [...new Set(hosts)];
     }
-    return [...new Set(hosts)]
-  } catch {
-    return []
-  }
+    catch {
+        return [];
+    }
 }

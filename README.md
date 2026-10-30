@@ -1,17 +1,19 @@
 # dsh-public-access（`@timgong/dsh-public-access`）
 
+[简体中文](README.md) | [English](README.en.md)
+
 DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`--public-url` / TLS、nginx，以及用户名密码登录认证。
 
 > **包名**：`@timgong/dsh-public-access`（fork 自 JNan-QQ/dsh-public-access）。
 >
-> **兼容性**：2.1.2 适配 **dsh 0.2.1-rc.2**（`>=0.2.1-rc.2 <0.3.0`）。dsh 0.1.x 请继续使用 1.3.0。
+> **兼容性**：2.2.0-beta 适配 **dsh 0.2.1-rc.2**（`>=0.2.1-rc.2 <0.3.0`）。dsh 0.1.x 请继续使用 1.3.0。
 
 ## 📖 简介
 
 `@timgong/dsh-public-access` 是一个 DeepSeek Harness 插件，用于将本地开发环境暴露到公网或局域网，同时提供安全的登录认证机制。该插件解决了以下核心问题：
 
 - **网络绑定**：dsh 0.2.1 在 CLI 和 `webserver` 配置 schema 两处都拒绝通配地址；插件在 boot 路径上就地放宽 `WebServer.Config.host`，重新允许 `0.0.0.0` / `::`
-- **安全认证**：在 dsh 原生启动令牌 / 签名 Cookie 之上叠加用户名密码登录，插件会话 24 小时有效
+- **安全认证**：在 dsh 原生启动令牌 / 签名 Cookie 之上叠加用户名密码登录，插件会话滑动续期（空闲 24 小时失效、最长 7 天）
 - **鉴权接入**：0.2.1 的 `/api` 走 `connection.admit` 而不是 `requestRejection`，插件把会话接入 `admit` 与 `authorizeIndex`
 - **前端兼容**：注入 `__DSH_TRANSPORT__.ownsHost` 与 `crypto.randomUUID` polyfill，保证非回环、明文 HTTP 访问下设置持久化与 RPC 正常
 
@@ -20,20 +22,43 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 | 功能 | 说明 |
 |------|------|
 | 🌐 **全接口绑定** | 自定义 `web-startup` + 就地放宽 boot 路径的 webserver `host` schema，解除 dsh 0.2.1 对 `0.0.0.0` / `::` 的限制 |
-| 🔐 **登录认证** | 在 dsh 0.2.1 原生浏览器鉴权之上叠加用户名/密码登录，`dsh_session` 24 小时有效（两种鉴权并存） |
+| 🔐 **登录认证** | 在 dsh 0.2.1 原生浏览器鉴权之上叠加用户名/密码登录；`dsh_session` 滑动续期：空闲 24 小时失效、最长 7 天（两者可配） |
+| 🌐 **中英双语** | 登录页支持中文 / English：按 URL 参数、Cookie、`DSH_AUTH_LANG`、`Accept-Language` 依次判定，页面底部可切换 |
 | 🛡️ **信任栅栏** | 保留 dsh 的 Host/Origin 栅栏；`--trusted-host` 声明公网 IP/域名，LAN 地址由插件自动推导 |
 | 🖥️ **前端兼容** | 注入 `__DSH_TRANSPORT__.ownsHost`，使公网访问获得回环级 `isLoopback` 状态 |
 | 🔒 **crypto polyfill** | 公网 HTTP 环境补齐 `crypto.randomUUID`，优先使用 `getRandomValues` |
 | 🚀 **自动检测** | `start.sh` 自动探测公网 IP 并配置 trusted-host / public-url；LAN 地址由 `web-startup` 按网卡推导 |
 | 🧹 **可撤销登出** | 登出同时清除 `dsh_session` 与请求中所有 `dsh-auth-*` 原生 Cookie |
 
-## ⬆️ 从 1.3.0 / 2.0.0 升级到 2.1.2
+## ⬆️ 升级到 2.2.0-beta（预发布）
+
+> **预发布**：`2.2.0-beta` 是测试版，用来验证滑动续期、v2 令牌与登录页双语；稳定后再发正式版 `2.2.0`。安装请写显式版本号（`@2.2.0-beta`），预发布版本不会被 `@latest` 命中。
+
+### 2.2.0-beta 变更
+
+- **会话滑动续期**：`dsh_session` 不再是从登录起固定 24 小时。空闲 24 小时失效，活跃使用时每 5 分钟最多续期一次，最长 7 天；三个窗口都可用 `DSH_AUTH_IDLE_HOURS` / `DSH_AUTH_MAX_DAYS` / `DSH_AUTH_RENEW_MINUTES` 调整。
+- **新增 `POST /_auth/renew`**：由注入 index 的心跳脚本调用（仅标签页可见且有输入时），只刷新已有会话，未登录请求不会拿到 Cookie。
+- **令牌格式 v2**：`dsh_session` 变为 `issuedAt.expiresAt.signature`。旧的 2 段令牌仍然可用，会在下一次续期时自动升级——**升级后不需要重新登录**。
+- **构建流程**：`src/*.ts` 成为唯一源码，`src/*.js` 由 `npm run build`（tsc 就地输出）生成；发布前会自动校验产物是否与源码一致。
+- **登录页中英双语**：登录页与登录错误提示支持中文 / English，默认跟随浏览器 `Accept-Language`，页面底部可切换并用 Cookie 记住；`DSH_AUTH_LANG` 可统一部署默认语言。
+- 无破坏性配置变更：不设置新环境变量时行为即上表默认值（24h / 7d / 5min）。
+
+### 从 2.1.x 升级
+
+```bash
+dsh plugin --profile web add @timgong/dsh-public-access@2.2.0-beta
+sudo systemctl restart dsh   # 或重启你的 dsh --profile web 进程
+```
+
+启动日志会打印生效的会话策略，例如 `(idle 24h, max 7d, renew 5m)`；已登录的浏览器无需重新登录。
+
+### 从 1.3.0 / 2.0.0 升级
 
 0.1.x → 0.2.1 的上游鉴权入口和行为都变了，2.0.0 是 breaking release；2.1.1 同时把包名从 `dsh-public-access` 改为 **`@timgong/dsh-public-access`**，因此需要先移除旧包再安装新包：
 
 1. 先把 dsh 升级到 `0.2.1-rc.2`；
 2. 移除旧包：`dsh plugin --profile web remove dsh-public-access`；
-3. 安装新包：`dsh plugin --profile web add @timgong/dsh-public-access@2.1.2`（未发布 npm 时用 `github:laoer/dsh-public-access` 或本地路径）；
+3. 安装新包：`dsh plugin --profile web add @timgong/dsh-public-access@2.2.0-beta`（未发布 npm 时用 `github:laoer/dsh-public-access` 或本地路径）；
 4. 重启 `dsh --profile web`；
 5. 确认启动日志没有 `webserver: ... wildcard ...`，并访问 `/` 检查是否跳转 `/_auth/login`；
 6. 已签发的 `dsh_session` 仍有效，通常不需要重新登录。
@@ -46,7 +71,7 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 
 ```bash
 # 已发布到 npm 时
-dsh plugin --profile web add @timgong/dsh-public-access@2.1.2
+dsh plugin --profile web add @timgong/dsh-public-access@2.2.0-beta
 
 # 未发布 npm 时，从 GitHub 仓库安装（pnpm 读取仓库里的 package.json）
 dsh plugin --profile web add github:laoer/dsh-public-access
@@ -157,6 +182,10 @@ sudo systemctl start dsh
 | `DSH_AUTH_USER` | `admin` | 登录用户名 |
 | `DSH_AUTH_PASS` | `admin` | 登录密码 |
 | `DSH_AUTH_SALT` | `dsh-reverse-proxy-salt` | 密码哈希盐值 |
+| `DSH_AUTH_IDLE_HOURS` | `24` | 滑动会话的空闲窗口（小时）：这么久没有续期即失效 |
+| `DSH_AUTH_MAX_DAYS` | `7` | 会话绝对上限（天），从登录时刻算起；`0` 表示不设上限 |
+| `DSH_AUTH_RENEW_MINUTES` | `5` | 续期节流：最多每 N 分钟写一次 `Set-Cookie` |
+| `DSH_AUTH_LANG` | 跟随浏览器 | 登录页语言：`zh-CN` 或 `en`；不设置时按 `Accept-Language` 自动选择 |
 | `DSH_HOST` | `0.0.0.0` | `start.sh` 传给 `--host` 的绑定地址 |
 | `DSH_PORT` | `3080` | 监听端口 |
 | `DSH_PUBLIC_URL` | 空 | 传给 `--public-url` 的对外根 URL |
@@ -252,10 +281,12 @@ server {
 
 dsh 0.2.1 为 Web 端引入了原生浏览器鉴权：每个进程生成随机启动令牌，访问 `http://<host>:<port>/?token=...` 后换取绑定该 authority 的签名 Cookie（默认 30 天）。`/api` 与 `index.html` 都要求该 Cookie，且 `/api` 先经过 Host/Origin 栅栏。本插件在该机制**之上**叠加用户名/密码登录：
 
-- **插件登录（推荐，便于多人共享）**：未登录访问根路径时跳转 `/_auth/login`，使用 `DSH_AUTH_USER` / `DSH_AUTH_PASS` 登录，签发 24 小时有效的 `dsh_session` Cookie。
+- **插件登录（推荐，便于多人共享）**：未登录访问根路径时跳转 `/_auth/login`，使用 `DSH_AUTH_USER` / `DSH_AUTH_PASS` 登录，签发滑动续期的 `dsh_session` Cookie。
 - **鉴权接入点**：dsh 0.2.1 的 `/api` 和 API WebSocket 升级走 `connection.admit`，index 走 `connection.authorizeIndex`；插件把有效 `dsh_session` 接入这两个方法，其余请求原样交给 dsh 原生令牌/Cookie 流程。
 - **信任栅栏**：Host/Origin 栅栏仍然生效。`--trusted-host` 声明公网 IP/域名；`0.0.0.0` 时插件按网卡推导 LAN 地址，`start.sh` 另外探测公网 IP。未声明的 Host 访问 `/api` 会得到 403。
-- **会话管理**：`dsh_session` 使用 HMAC-SHA256 签名；密码使用 SHA-256 加盐哈希；用户名与密码比较都使用 `timingSafeEqual` 防止时序攻击。登出会清除 `dsh_session` 以及请求中所有 `dsh-auth-*` 原生 Cookie。
+- **滑动续期**：会话空闲 `DSH_AUTH_IDLE_HOURS`（默认 24）小时失效，活跃使用时最多每 `DSH_AUTH_RENEW_MINUTES`（默认 5）分钟续期一次，但无论如何不超过登录后 `DSH_AUTH_MAX_DAYS`（默认 7）天。续期有两条路径：注入到 index 的心跳脚本调用 `POST /_auth/renew`（仅当标签页可见、且这一轮内用户有键盘/指针输入）；以及每次 index 加载时在鉴权闸门里顺带续期（覆盖禁用 JS 或静态部署）。心跳只刷新已有会话——`/_auth/renew` 不会给未登录请求发 Cookie，且要求 `x-dsh-renew: 1` 头，跨站表单/图片无法触发。
+- **登录页语言**：按 `?lang=` → `dsh_lang` Cookie → `DSH_AUTH_LANG` → `Accept-Language` 的顺序判定；只有在用户点击页面上的语言链接时才写入 Cookie（一年有效），所以自动检测结果不会被固化。
+- **会话管理**：`dsh_session` 使用 HMAC-SHA256 签名；v2 令牌携带 `issuedAt.expiresAt`，并用域分隔前缀签名，防止与旧格式互相重放；升级前的 2 段令牌仍可验证，并会在下一次续期时自动升级。密码使用 SHA-256 加盐哈希；用户名与密码比较都使用 `timingSafeEqual` 防止时序攻击。登出会清除 `dsh_session` 以及请求中所有 `dsh-auth-*` 原生 Cookie。
 - **前端兼容**：注入脚本设置 `globalThis.__DSH_TRANSPORT__.ownsHost = true`，使公网访问获得与回环一致的 `isLoopback` 状态（主机设置持久化、文件打开等功能可用）；并补齐公网 HTTP 下的 `crypto.randomUUID`。
 
 ### 通配绑定的安全边界
@@ -304,6 +335,8 @@ date
 # 清除浏览器缓存和 Cookie
 ```
 
+如果是一直用着突然被踢：会话有绝对上限，登录满 `DSH_AUTH_MAX_DAYS`（默认 7）天后必须重新登录；标签页长期在后台或长时间无操作，超过 `DSH_AUTH_IDLE_HOURS`（默认 24）小时也会失效。
+
 #### 3. 启动时报 webserver wildcard / `--host 0.0.0.0` 不可用
 
 说明插件没能就地放宽 boot 路径的 `WebServer.Config.host`（dsh 版本不匹配，或 boot 路径解析失败）。处理：
@@ -320,11 +353,11 @@ dsh --profile web --dump-config | grep -A3 web-startup
 
 #### 4. 登录 POST 返回 405，地址是 `/_auth/_auth/login`
 
-2.1.0 的登录表单使用了错误的相对路径（`_auth/login`），从 `/_auth/login` 会拼成 `/_auth/_auth/login`。2.1.1 已改为同级 `login`，并修正登录成功/登出的相对跳转。升级到 2.1.2 后强制刷新登录页（或清缓存）：
+2.1.0 的登录表单使用了错误的相对路径（`_auth/login`），从 `/_auth/login` 会拼成 `/_auth/_auth/login`。2.1.1 已改为同级 `login`，并修正登录成功/登出的相对跳转。升级到 2.2.0-beta 后强制刷新登录页（或清缓存）：
 
 ```bash
 dsh plugin --profile web remove dsh-public-access
-dsh plugin --profile web add @timgong/dsh-public-access@2.1.2
+dsh plugin --profile web add @timgong/dsh-public-access@2.2.0-beta
 sudo systemctl restart dsh
 ```
 
@@ -372,16 +405,21 @@ journalctl -u dsh -f
 ```
 dsh-public-access/
 ├── src/
-│   ├── reverse-proxy-fix.js   # 主插件（登录路由 + admit/authorizeIndex 适配 + polyfill）
-│   ├── auth.js                # 认证模块（会话、密码验证、登录页面）
+│   ├── *.ts                   # 唯一源码（tsc 就地生成同名 .js）
+│   ├── reverse-proxy-fix.js   # 主插件（登录/登出/续期路由 + admit/authorizeIndex 适配 + polyfill）
+│   ├── auth.js                # 认证模块（v2 会话令牌、滑动续期策略、密码验证、登录页面）
+│   ├── login-i18n.js          # 登录页文案与语言判定（zh-CN / en）
 │   ├── web-startup.js         # Web 启动配置（放宽 host schema、新 flag、trustedHosts 推导）
 │   ├── webserver-schema.js    # boot 路径 webserver host schema 放宽 + LAN authority 推导
 │   └── public-url.js          # --public-url 校验（与 stock 规则一致）
 ├── test/                      # node:test 单元测试
+├── tsconfig.json              # 类型检查配置（noEmit）
+├── tsconfig.build.json        # 构建配置（就地生成 src/*.js）
 ├── cordis.patch.yml           # DSH 插件配置补丁
 ├── start.sh                   # 启动脚本
 ├── package.json               # 包配置
-└── README.md                  # 说明文档
+├── README.md                  # 中文说明文档
+└── README.en.md               # English documentation
 ```
 
 ## 🤝 贡献指南
@@ -404,12 +442,32 @@ cd dsh-public-access
 # 安装依赖
 pnpm install
 
-# 运行单元测试
-npm test
+# 类型检查 + 单元测试
+npm run check
 
 # 以 link: 方式装进 web profile
 dsh plugin --profile web add .
 ```
+
+### 构建（`src/*.ts` → `src/*.js`）
+
+`src/*.ts` 是唯一源码，`src/*.js` 是构建产物：dsh 运行时、`package.json` 的 `main`/`exports` 以及测试都直接加载 `.js`。构建采用**就地 tsc 输出**（`.js` 与 `.ts` 同目录、同文件名），因此包结构与安装方式不变，从 git 安装也无需额外构建步骤。
+
+```bash
+npm run build          # tsc -p tsconfig.build.json，就地生成 src/*.js
+npm run typecheck      # tsc -p tsconfig.json（noEmit，只做类型检查）
+npm run check          # typecheck + test
+npm run verify:artifacts  # build 后校验 src/*.js 与提交版本一致（发布前由 prepublishOnly 自动执行）
+```
+
+约定：
+
+- **只改 `.ts`，不要手改 `.js`**；改完跑 `npm run build`，把生成结果一起提交。
+- `.js` 必须随仓库提交：`dsh plugin add github:...` 不会在安装时编译，产物缺失会导致插件加载失败。
+- tsc 会把缩进统一成 4 空格并补分号，这是预期行为；注释与 JSDoc 会保留。
+- `prepublishOnly` 会执行 `verify:artifacts` + `test`，产物过期时无法发布。
+
+> 为什么不用 tsup/esbuild：本项目没有打包需求（每个文件都是独立 ESM 入口），而 esbuild 默认会丢弃注释——`src/*.js` 里的 JSDoc 是 JS 使用方唯一的文档，因此选择保留注释的 tsc 就地输出。
 
 ### 代码规范
 

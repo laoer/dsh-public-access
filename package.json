@@ -1,6 +1,6 @@
 {
   "name": "@timgong/dsh-public-access",
-  "version": "2.1.2",
+  "version": "2.2.0-beta",
   "description": "DeepSeek Harness plugin - public/LAN access (0.0.0.0 + trusted hosts) with login auth, compatible with dsh 0.2.1-rc.2 (laoer fork)",
   "type": "module",
   "main": "src/reverse-proxy-fix.js",
@@ -12,6 +12,7 @@
     "src/",
     "cordis.patch.yml",
     "start.sh",
+    "README.en.md",
     "README.md"
   ],
   "keywords": [
@@ -40,8 +41,13 @@
     "url": "git+https://github.com/laoer/dsh-public-access.git"
   },
   "scripts": {
-    "start": "./start.sh",
-    "test": "node --test test/*.test.js"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.js",
+    "check": "npm run typecheck && npm test",
+    "verify:artifacts": "npm run build && git diff --exit-code -- src",
+    "prepublishOnly": "npm run verify:artifacts && npm test",
+    "start": "./start.sh"
   },
   "homepage": "https://github.com/laoer/dsh-public-access",
   "bugs": {
@@ -61,5 +67,9 @@
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "~5.9.3"
   }
 }

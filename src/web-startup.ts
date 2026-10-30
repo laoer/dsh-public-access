@@ -43,9 +43,14 @@ function configureOutput(program: any): void {
   for (const child of program.commands) configureOutput(child)
 }
 
-function isCommanderError(error: any): boolean {
+function isCommanderError(error: unknown): error is { code: string; exitCode: number } {
   if (typeof error !== 'object' || error === null) return false
-  return typeof error.code === 'string' && error.code.startsWith('commander.') && typeof error.exitCode === 'number'
+  const candidate = error as { code?: unknown; exitCode?: unknown }
+  return (
+    typeof candidate.code === 'string' &&
+    candidate.code.startsWith('commander.') &&
+    typeof candidate.exitCode === 'number'
+  )
 }
 
 function webCommand() {

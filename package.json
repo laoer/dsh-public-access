@@ -1,6 +1,6 @@
 {
   "name": "@timgong/dsh-public-access",
-  "version": "2.2.0-beta.2",
+  "version": "2.3.0-beta.1",
   "description": "DeepSeek Harness plugin - public/LAN access (0.0.0.0 + trusted hosts) with password auth, scrypt credential store and settings-panel password change, compatible with dsh 0.2.1-rc.2 (laoer fork)",
   "type": "module",
   "main": "src/reverse-proxy-fix.js",
@@ -13,6 +13,7 @@
     "src/",
     "cordis.patch.yml",
     "start.sh",
+    "docs/",
     "README.en.md",
     "README.md"
   ],

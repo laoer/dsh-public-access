@@ -6,7 +6,7 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 
 > **包名**：`@timgong/dsh-public-access`（fork 自 JNan-QQ/dsh-public-access）。
 >
-> **兼容性**：2.2.0-beta 适配 **dsh 0.2.1-rc.2**（`>=0.2.1-rc.2 <0.3.0`）。dsh 0.1.x 请继续使用 1.3.0。
+> **当前版本**：`2.3.0-beta.1`，适配 **dsh `>=0.2.1-rc.2 <0.3.0`**（实测基线 0.2.1-rc.5）。dsh 0.1.x 请继续使用插件 1.3.0。
 
 ## 📖 简介
 
@@ -14,6 +14,7 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 
 - **网络绑定**：dsh 0.2.1 在 CLI 和 `webserver` 配置 schema 两处都拒绝通配地址；插件在 boot 路径上就地放宽 `WebServer.Config.host`，重新允许 `0.0.0.0` / `::`
 - **安全认证**：在 dsh 原生启动令牌 / 签名 Cookie 之上叠加用户名密码登录，插件会话滑动续期（空闲 24 小时失效、最长 7 天）
+- **凭据管理**：密码用 `scrypt` 存在 `$DSH_HOME/dsh-public-access.json`（`0600`），首次启动生成随机密码，改密在「设置 → 认证」里点两下完成，忘记密码用 `auth-reset` 恢复
 - **鉴权接入**：0.2.1 的 `/api` 走 `connection.admit` 而不是 `requestRejection`，插件把会话接入 `admit` 与 `authorizeIndex`
 - **前端兼容**：注入 `__DSH_TRANSPORT__.ownsHost` 与 `crypto.randomUUID` polyfill，保证非回环、明文 HTTP 访问下设置持久化与 RPC 正常
 
@@ -34,56 +35,56 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 | 🚀 **自动检测** | `start.sh` 自动探测公网 IP 并配置 trusted-host / public-url；LAN 地址由 `web-startup` 按网卡推导 |
 | 🧹 **可撤销登出** | 登出同时清除 `dsh_session` 与请求中所有 `dsh-auth-*` 原生 Cookie |
 
-设置面板 → 认证（实机截图，左：中文；`docs/settings-panel.en.png` 为英文）：
+设置面板 → 认证（dsh 0.2.1-rc.5 实机截图；英文版见 [`docs/settings-panel.en.png`](docs/settings-panel.en.png)）：
 
 ![设置面板 → 认证](docs/settings-panel.zh.png)
 
-## ⬆️ 升级到 2.2.0-beta.2（预发布）
+## ⬆️ 升级到 2.3.0-beta.1
 
-> **预发布**：`2.2.0-beta.2` 是测试版，用来验证凭据文件、登录限速与「设置 → 认证」面板；稳定后再发正式版 `2.2.0`。安装请写显式版本号（`@2.2.0-beta.2`），预发布版本不会被 `@latest` 命中。
+> `2.3.0-beta.1` 是在 `2.2.0-beta` 基础上重做凭据模型、加上登录限速与设置面板的一版，**不并入 `2.2.0-beta` 发布线**。安装请写显式版本号（`@2.3.0-beta.1`），预发布版本不会被 `@latest` 命中。
 
-### 2.2.0-beta.2 变更（含破坏性变更）
+### 本版变更（含破坏性变更）
 
 **凭据模型重做（breaking）**
 
-- **不再有 `admin/admin` 默认密码**。首次启动时，如果没有配置 `DSH_AUTH_PASS`，插件会**生成随机管理员密码**，打印到启动日志，并写入 `$DSH_HOME/dsh-public-access.initial-password`（`0600`，默认 `~/.dsh/` 下）以便随时查看。登录后到 **设置 → 认证** 改密，该明文文件会自动删除。
-- **凭据存到文件**：`$DSH_HOME/dsh-public-access.json`（`0600`，目录 `0700`），包含管理员名、`scrypt` 密码散列与**随机会话签名密钥**。环境变量只在**首次**启动、且文件还不存在时用来播种（迁移用途）；文件存在后 `DSH_AUTH_PASS` 会被忽略并打印提示——避免 systemd 里的旧变量把面板改过的密码覆盖回去。
+- **不再有 `admin/admin` 默认密码**。首次启动时如果没有配置 `DSH_AUTH_PASS`，插件会**生成随机管理员密码**，打印到启动日志，并写入 `$DSH_HOME/dsh-public-access.initial-password`（`0600`，默认 `~/.dsh/` 下）。登录后到 **设置 → 认证** 改密，该明文文件会自动删除。
+- **凭据存到文件**：`$DSH_HOME/dsh-public-access.json`（`0600`，目录 `0700`），含管理员名、`scrypt` 散列与**随机会话签名密钥**。环境变量只在**首次**启动、且文件不存在时用来播种；文件存在后 `DSH_AUTH_PASS` 会被忽略并打印提示。
 - **密码散列升级为 `scrypt`**（N=16384, r=8, p=1，随机 16 字节盐），替换原来的 `SHA-256(salt‖password)`。
-- **`DSH_AUTH_SALT` 已废弃**，设了也不生效，可以删掉。
-- **升级后需要重新登录一次**：会话密钥不再是「密码散列 + 盐」派生，旧的 `dsh_session` 无法验证。这是一次性代价。
+- **`DSH_AUTH_SALT` 废弃**，设了也不生效。
+- **升级后需要重新登录一次**：会话密钥不再由「密码散列 + 盐」派生，旧 `dsh_session` 无法验证。一次性代价。
 - **`DSH_AUTH_PASS` 建议不要再配置**：环境变量对同机其他用户可读（`ps e`、`/proc/<pid>/environ`、unit 文件）。保留它只为平滑迁移。
 
 **新增能力**
 
-- **登录限速**：同一客户端地址 5 次失败锁定 30 秒；累计 20 次失败后进入**全局指数退避**（每再 10 次翻倍，5s → 10s → … 上限 5 分钟），返回 `429` + `Retry-After`。真回环调用方不受全局惩罚影响，避免攻击者把管理员锁在自己机器外面。
-- **「设置 → 认证」面板改密**：新客户端插件，在设置面板里改密码、退出登录；改密成功会轮换会话密钥，**其他浏览器立即登出**，当前浏览器拿到新 Cookie 保持登录。文案随部署语言（中/英）下发，样式只用 `--dsw-alias-*` 主题变量。
-- **`dsh --profile web auth-reset`**：忘记密码时的恢复路径。交互式输入新密码（TTY 下不回显），或 `--password <新密码>`；`--username <新名>` 可改名。都会轮换会话密钥。
-- **`DSH_AUTH_REQUIRE_SESSION=1`**：把插件会话变成**唯一**凭据。开启后启动令牌 URL 与 dsh 原生 30 天浏览器 Cookie 都不再放行（默认关闭，保持原有"令牌可作为备选入口"的行为）。
-- **`DSH_AUTH_PROTECT_ROUTES=1`**：把状态交给插件会话的**第三方 webserver 路由**也纳入鉴权（默认关闭，因为要包住 harness 的私有路由表）。不开时启动日志会列出「不在插件会话闸门内」的路由，便于自查。
-- 登出改为主推 `POST /_auth/logout`；`GET` 仅在非跨站请求（`Sec-Fetch-Site` 校验）时仍可用，避免被任意页面强制登出。
-- `--host` 的具体 IPv6 / IPv4 字面量也纳入 schema 拓宽门禁，失败时同样 fail loud。
+- **登录限速**：单地址 5 次失败锁 30 秒；累计 20 次失败后全局指数退避（每再 10 次翻倍，5s→…→5min 上限），`429` + `Retry-After`；真回环调用方不受全局惩罚。
+- **「设置 → 认证」面板**：改密码、退出登录；改密轮换会话密钥，**其他浏览器立即登出**，当前浏览器拿到新 Cookie 保持登录。文案跟随部署语言，样式只用 `--dsw-alias-*` 主题变量。
+- **`dsh --profile web auth-reset`**：忘记密码的恢复路径，交互式（TTY 不回显）或 `--password`；`--username` 可改名。都会轮换会话密钥。
+- **`DSH_AUTH_REQUIRE_SESSION=1`**：插件会话成为**唯一**凭据，启动令牌 URL 与 dsh 原生 30 天 Cookie 都不再放行（默认关闭）。
+- **`DSH_AUTH_PROTECT_ROUTES=1`**：把第三方 webserver 路由也纳入鉴权（默认关闭）；不开时启动日志会列出闸门外的路由。
+- 登出主推 `POST /_auth/logout`；`GET` 仅在非跨站请求时可用，避免被任意页面强制登出。
+- `--host` 的具体 IPv4/IPv6 字面量也纳入 schema 拓宽门禁，失败时同样 fail loud。
 
 ### 从 2.1.x / 2.2.0-beta 升级
 
 ```bash
-dsh plugin --profile web add @timgong/dsh-public-access@2.2.0-beta.2
+dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1
 sudo systemctl restart dsh   # 或重启你的 dsh --profile web 进程
 ```
 
-1. 如果 unit 文件里还写着 `DSH_AUTH_PASS`：**它会被一次性播种进凭据文件**，随后即可删除该变量（插件会提示"已忽略"）。如果删除前就已经登录过，密码就是那个变量里的值。
-2. 如果从来没设过 `DSH_AUTH_PASS`（也就是一直在用 `admin/admin`）：升级后**旧密码立即失效**，请从启动日志或 `~/.dsh/dsh-public-access.initial-password` 取随机密码登录，然后到设置面板改密。
+1. unit 文件里若还有 `DSH_AUTH_PASS`：它会被**一次性播种**进凭据文件，之后即可删除（插件会提示"已忽略"）。播种的密码就是该变量的值。
+2. 如果从来没设过 `DSH_AUTH_PASS`（一直在用 `admin/admin`）：升级后**旧密码立即失效**，请从启动日志或 `~/.dsh/dsh-public-access.initial-password` 取随机密码登录，然后改密。
 3. 所有浏览器需要重新登录一次（会话密钥换了）。
-4. 想换回固定密码：登录后到 **设置 → 认证** 修改，或 `dsh --profile web auth-reset`。
+4. 想回到固定密码：登录后「设置 → 认证」，或 `dsh --profile web auth-reset`。
 
 ### 从 1.3.0 / 2.0.0 升级
 
 0.1.x → 0.2.1 的上游鉴权入口和行为都变了，2.0.0 是 breaking release；2.1.1 同时把包名从 `dsh-public-access` 改为 **`@timgong/dsh-public-access`**，因此需要先移除旧包再安装新包：
 
-1. 先把 dsh 升级到 `0.2.1-rc.2`；
+1. 先把 dsh 升级到 `0.2.1-rc.2` 或更新；
 2. 移除旧包：`dsh plugin --profile web remove dsh-public-access`；
-3. 安装新包：`dsh plugin --profile web add @timgong/dsh-public-access@2.2.0-beta.2`（未发布 npm 时用 `github:laoer/dsh-public-access` 或本地路径）；
+3. 安装新包：`dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1`（未发布 npm 时用 `github:laoer/dsh-public-access` 或本地路径）；
 4. 重启 `dsh --profile web`，从日志或 `~/.dsh/dsh-public-access.initial-password` 取随机密码登录；
-5. 确认启动日志没有 `webserver: ... wildcard ...`，并访问 `/` 检查是否跳转 `/_auth/login`。
+5. 确认启动日志没有 `webserver: ... wildcard ...`，且访问 `/` 会跳转 `/_auth/login`。
 
 如果仍在使用 dsh 0.1.x，请继续使用插件 1.3.0，不要升级到 2.x。
 
@@ -92,8 +93,8 @@ sudo systemctl restart dsh   # 或重启你的 dsh --profile web 进程
 ### 方式一：通过 DSH 插件管理器安装（推荐）
 
 ```bash
-# 已发布到 npm 时
-dsh plugin --profile web add @timgong/dsh-public-access@2.2.0-beta
+# 已发布到 npm 时（预发布请写显式版本号）
+dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1
 
 # 未发布 npm 时，从 GitHub 仓库安装（pnpm 读取仓库里的 package.json）
 dsh plugin --profile web add github:laoer/dsh-public-access
@@ -311,23 +312,108 @@ server {
 }
 ```
 
+## 🧭 工作原理
+
+### 三道闸门，插件只接两道
+
+dsh 0.2.1 的 Web 入口按请求类型分成三条路，插件把会话接入其中两条，第三条原样留给上游：
+
+| 请求 | dsh 的闸门 | 插件的行为 |
+|---|---|---|
+| `/api` 与 API WebSocket 升级 | `connection.admit(req)` | 会话有效 → 以 `browserPeer`（owner 身份）准入；无效 → 交回上游原生判定 |
+| `/` 与 `index.html` | `connection.authorizeIndex(req, res)` | 会话有效 → 放行，并在这次加载里顺带续期；无效 → `302 /_auth/login` |
+| 静态资源、插件自有路由、`/connect` | 上游不设防 | 默认不介入（`DSH_AUTH_PROTECT_ROUTES=1` 可把第三方路由也包住） |
+
+```text
+浏览器
+  │  GET /              Cookie: dsh_session
+  ▼
+dsh webserver ──► connection.authorizeIndex ──► 有效 ─► 渲染 SPA（并续期 Cookie）
+                                              └─ 无效 ─► 302 /_auth/login
+  │  POST /api/...
+  ▼
+/api 路由 ──► connection.admit ──► 有效 ─► browserPeer（owner）
+                                  └ 无效 ─► 上游原生判定（启动令牌 Cookie / 401）
+  │  POST /_auth/login       （插件自有 exact 路由，不经过上面两道闸门）
+  ▼
+校验用户名密码 → 下发 dsh_session → 302 ../
+```
+
+### 为什么是"叠加"而不是"接管"
+
+插件不包 `webServer.register`、不伪造 dsh 原生 `dsh-auth-*` Cookie，只接上游文档化的两个准入方法。
+
+- **收益**：上游改内部结构时，插件坏的方式是**启动抛错**，不会"看起来正常但闸门没了"。
+- **代价**：覆盖面由上游定义决定——第三方插件自己注册在 `webServer` 上的路由不在范围内。启动日志会列出这些路由，`DSH_AUTH_PROTECT_ROUTES=1` 可把它们也纳入。
+
+### 会话与 Cookie
+
+- `dsh_session` 形如 `issuedAt.expiresAt.HMAC-SHA256`，密钥存在凭据文件里 → 重启不掉线、改密即全端下线。
+- 滑动续期：空闲 `DSH_AUTH_IDLE_HOURS`（默认 24h）失效；活跃时最多每 `DSH_AUTH_RENEW_MINUTES`（默认 5min）续一次；硬上限 `DSH_AUTH_MAX_DAYS`（默认 7d）。
+- 续期两条路径：注入 index 的心跳（仅标签页可见**且**本轮有键盘/指针输入时触发 `POST /_auth/renew`），以及每次 index 加载时在闸门里顺带续期（覆盖禁用 JS 的客户端）。
+- Cookie 属性：`HttpOnly; SameSite=Lax`；TLS 直连或 `--public-url https://…` 时追加 `Secure`。
+
+### 前端注入的两段脚本
+
+1. `globalThis.__DSH_TRANSPORT__.ownsHost = true` —— 让非回环访问拿到与回环一致的 `isLoopback`，否则设置面板的持久化会退化成内存模式（Models 页报 `settings are unavailable in this browser`）。
+2. `crypto.randomUUID` polyfill —— 明文 HTTP 属于非安全上下文，缺这个方法会让每个 RPC 请求抛 `TypeError`。
+
+## 🔑 认证与凭据
+
+### 凭据文件
+
+`$DSH_HOME/dsh-public-access.json`（默认 `~/.dsh/`，文件 `0600`、目录 `0700`）：
+
+```json
+{
+  "version": 1,
+  "username": "admin",
+  "passwordHash": "scrypt$16384$8$1$<salt-hex>$<hash-hex>",
+  "secret": "<32 字节十六进制>",
+  "createdAt": 1793350000000,
+  "updatedAt": 1793350000000
+}
+```
+
+- `passwordHash`：`scrypt`（N=16384, r=8, p=1，随机 16 字节盐）。参数写在字符串里，将来调高成本不会破坏格式。
+- `secret`：会话 HMAC 密钥。**改密 / 改名 / `auth-reset` 都会轮换它**——这就是"改密 = 所有浏览器下线"的实现方式。
+- 文件里**没有明文密码**；读取按 `mtime+size` 缓存，所以每个请求不会重复解析文件。
+
+### 首次启动会怎样
+
+| 情形 | 结果 |
+|---|---|
+| 凭据文件已存在 | 直接使用；即使设了 `DSH_AUTH_PASS` 也会被忽略并打印提示 |
+| 文件不存在 + 设了 `DSH_AUTH_PASS` | 用该密码**播种一次**（迁移通道），提示删除该变量 |
+| 文件不存在 + 没设密码 | 生成 20 位随机密码，打印到日志并写入 `dsh-public-access.initial-password`（`0600`） |
+
+### 修改与恢复
+
+| 想要 | 怎么做 | 副作用 |
+|---|---|---|
+| 改密码 | 设置 → 认证，或 `auth-reset --password '<新密码>'` | 轮换密钥；其他浏览器下线；明文文件删除 |
+| 改用户名 | `auth-reset --username <新名>` | 同上 |
+| 忘记密码 | `dsh --profile web auth-reset`（交互式，TTY 不回显） | 同上 |
+| 连账号都不想要了 | 删掉凭据文件后重启 | 重新生成随机密码 |
+| 多实例互不干扰 | 每个实例独立 `DSH_HOME`，或用 `DSH_AUTH_FILE` 指定路径 | — |
+
+### 登录限速
+
+单地址 5 次失败锁 30 秒；累计 20 次失败后进入全局指数退避（每再 10 次翻倍，5s → … → 5min 上限），返回 `429` + `Retry-After`。只认 TCP 对端地址，**不采信 `X-Forwarded-For`**；真回环调用方豁免全局惩罚，避免攻击者把管理员锁在自己机器外。
+
+> 反向代理后面所有客户端共享代理地址，单地址限速会比实际更严格——这种部署请调高 `DSH_AUTH_MAX_FAILURES`，或把限速放到代理层。
+
 ## 🔒 安全说明
 
 ### 认证机制（dsh 0.2.1 适配）
 
-dsh 0.2.1 为 Web 端引入了原生浏览器鉴权：每个进程生成随机启动令牌，访问 `http://<host>:<port>/?token=...` 后换取绑定该 authority 的签名 Cookie（默认 30 天）。`/api` 与 `index.html` 都要求该 Cookie，且 `/api` 先经过 Host/Origin 栅栏。本插件在该机制**之上**叠加用户名/密码登录：
+dsh 0.2.1 自带一套原生浏览器鉴权（启动令牌换 30 天签名 Cookie，`/api` 与 index 都要它，`/api` 还先过 Host/Origin 栅栏）。本插件在它**之上**叠加自己的会话：
 
-- **凭据来源**：`$DSH_HOME/dsh-public-access.json`（默认 `~/.dsh/`，`0600`，目录 `0700`）。密码用 `scrypt`（N=16384、r=8、p=1、随机 16 字节盐）散列；会话密钥是另一个随机 32 字节值，**改密即轮换**，所以"改密 = 所有浏览器下线"是真的。
-- **首次启动**：没有凭据文件时——设了 `DSH_AUTH_PASS` 就一次性播种（迁移用途），否则**生成随机密码**并写入 `$DSH_HOME/dsh-public-access.initial-password`（`0600`）。**不存在 `admin/admin` 默认账号**。改密成功后明文文件自动删除。
-- **环境变量不是密码存储**：文件存在后 `DSH_AUTH_PASS` 会被忽略并打印提示。环境变量对同机其他用户可读（`ps e`、`/proc/<pid>/environ`、unit 文件），只应作为迁移期临时手段。
-- **鉴权接入点**：dsh 0.2.1 的 `/api` 和 API WebSocket 升级走 `connection.admit`，index 走 `connection.authorizeIndex`；插件把有效 `dsh_session` 接入这两个方法，其余请求原样交给 dsh 原生令牌/Cookie 流程。`DSH_AUTH_REQUIRE_SESSION=1` 时这个"原样交给"被取消，插件会话成为唯一凭据。
-- **登录限速**：同一客户端地址 5 次失败锁 30 秒；累计 20 次失败后全局指数退避（每 10 次翻倍，5s→10s→…→5min 上限），`429` 带 `Retry-After`。只认 TCP 对端地址，**不采信 `X-Forwarded-For`**（客户端可伪造）；真回环调用方豁免全局惩罚，免得攻击者把管理员锁在自己机器外。
-- **信任栅栏**：Host/Origin 栅栏仍然生效。`--trusted-host` 声明公网 IP/域名；`0.0.0.0` 时插件按网卡推导 LAN 地址，`start.sh` 另外探测公网 IP。未声明的 Host 访问 `/api` 会得到 403。
-- **滑动续期**：会话空闲 `DSH_AUTH_IDLE_HOURS`（默认 24）小时失效，活跃使用时最多每 `DSH_AUTH_RENEW_MINUTES`（默认 5）分钟续期一次，但无论如何不超过登录后 `DSH_AUTH_MAX_DAYS`（默认 7）天。续期有两条路径：注入到 index 的心跳脚本调用 `POST /_auth/renew`（仅当标签页可见、且这一轮内用户有键盘/指针输入）；以及每次 index 加载时在鉴权闸门里顺带续期（覆盖禁用 JS 或静态部署）。心跳只刷新已有会话——`/_auth/renew` 不会给未登录请求发 Cookie，且要求 `x-dsh-renew: 1` 头，跨站表单/图片无法触发。
-- **面板改密**：`GET /_auth/password` 返回管理员名与文案，`POST /_auth/password` 收 JSON `{oldPassword, newPassword}`（≥8 字符）。只接受**带有效会话 + `application/json` + 同站请求**，所以跨站表单无法触发；改密后轮换密钥并给当前浏览器补发新 Cookie。
-- **登出**：`POST /_auth/logout` 清除 `dsh_session` 与请求中所有 `dsh-auth-*` 原生 Cookie。`GET` 仍可用，但跨站 `GET` 会被拒绝（避免任意页面把你登出）。
-- **登录页语言**：按 `?lang=` → `dsh_lang` Cookie → `DSH_AUTH_LANG` → `Accept-Language` 的顺序判定；只有在用户点击页面上的语言链接时才写入 Cookie（一年有效），所以自动检测结果不会被固化。
-- **前端兼容**：注入脚本设置 `globalThis.__DSH_TRANSPORT__.ownsHost = true`，使公网访问获得与回环一致的 `isLoopback` 状态（主机设置持久化、文件打开等功能可用）；并补齐公网 HTTP 下的 `crypto.randomUUID`。
+- **接入点**：`connection.admit`（`/api` + API WS 升级）与 `connection.authorizeIndex`（index），详见 [工作原理](#-工作原理)。
+- **凭据与会话**：`scrypt` 存盘、随机密钥签名、改密即全端下线，详见 [认证与凭据](#-认证与凭据)。
+- **信任栅栏**：Host/Origin 栅栏照常生效。`--trusted-host` 声明公网 IP / 域名；`--host 0.0.0.0` 时 LAN 地址由插件按网卡推导，`start.sh` 另外探测公网 IP。未声明的 Host 访问 `/api` 得到 403。
+- **唯一凭据模式**：`DSH_AUTH_REQUIRE_SESSION=1` 时启动令牌与原生 30 天 Cookie 都不再放行，只剩可撤销的插件会话。
+- **登出**：清除 `dsh_session` 与请求中所有 `dsh-auth-*` 原生 Cookie；跨站 `GET` 被拒绝。
 
 ### 通配绑定的安全边界
 
@@ -346,6 +432,18 @@ dsh 0.2.1 明确拒绝 `0.0.0.0`，理由是把所有接口暴露到网络会放
 4. **限制访问**：使用防火墙/安全组限制来源 IP
 5. **定期更新**：保持插件与 dsh 版本匹配
 
+### 上线检查清单
+
+按顺序过一遍，任何一条没做成就别把端口暴露到不可信网络：
+
+- [ ] **改掉随机密码**：设置 → 认证，改成自己的强密码；确认 `~/.dsh/dsh-public-access.initial-password` 已消失
+- [ ] **确认绑定范围**：能只绑私网就不绑 `0.0.0.0`；写了 `0.0.0.0` 就要有防火墙/安全组兜底
+- [ ] **TLS 就位**：`--tls-cert`/`--tls-key` 直连，或 nginx 终止；随后验证 Cookie 带 `Secure`（`curl -skD- -X POST …`）
+- [ ] **trusted-host 完整**：公网域名/IP 都声明了，否则 `/api` 会 403
+- [ ] **看清闸门外路由**：启动日志里 `outside the plugin session gate` 的列表要么为空，要么都是你信任的插件
+- [ ] **防火墙/安全组**只放行需要的来源；不需要公网就别开
+- [ ] **`DSH_AUTH_REQUIRE_SESSION`**：如果不想让启动令牌 URL 作为旁路，设为 `1`
+- [ ] **反向代理部署**：确认代理转发真实 `Host`（否则 Host 栅栏 403），并且 dsh 只监听 `127.0.0.1`
 
 ## 🛠️ 故障排除
 
@@ -417,11 +515,11 @@ dsh --profile web --dump-config | grep -A3 web-startup
 
 #### 5. 登录 POST 返回 405，地址是 `/_auth/_auth/login`
 
-2.1.0 的登录表单使用了错误的相对路径（`_auth/login`），从 `/_auth/login` 会拼成 `/_auth/_auth/login`。2.1.1 已改为同级 `login`，并修正登录成功/登出的相对跳转。升级到 2.2.0-beta 后强制刷新登录页（或清缓存）：
+2.1.0 的登录表单使用了错误的相对路径（`_auth/login`），从 `/_auth/login` 会拼成 `/_auth/_auth/login`。2.1.1 已改为同级 `login`，并修正登录成功/登出的相对跳转。升级到 2.3.0-beta.1 后强制刷新登录页（或清缓存）：
 
 ```bash
 dsh plugin --profile web remove dsh-public-access
-dsh plugin --profile web add @timgong/dsh-public-access@2.2.0-beta
+dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1
 sudo systemctl restart dsh
 ```
 
@@ -479,10 +577,12 @@ dsh-public-access/
 │   ├── webserver-schema.js    # boot 路径 webserver host schema 放宽 + LAN authority 推导
 │   ├── public-url.js          # --public-url 校验（与 stock 规则一致）
 │   └── client/index.js        # 浏览器半：（设置 → 认证）面板，__ModuleLoader__ 格式，无 React 打包
-├── test/                      # node:test 单元测试
+├── docs/                      # 截图等静态资源（随 npm 包发布）
+├── test/                      # node:test 单元测试（83 个）
 ├── tsconfig.json              # 类型检查配置（noEmit）
 ├── tsconfig.build.json        # 构建配置（就地生成 src/*.js；不含 client）
 ├── tsconfig.client.json       # 客户端半构建（moduleDetection: legacy，产出经典脚本）
+├── .github/workflows/ci.yml    # CI：typecheck + test + 产物不漂移
 ├── cordis.patch.yml           # DSH 插件配置补丁
 ├── start.sh                   # 启动脚本
 ├── package.json               # 包配置

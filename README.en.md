@@ -6,7 +6,7 @@ Public / LAN access plugin for DeepSeek Harness — `0.0.0.0` binding, `--public
 
 > **Package**: `@timgong/dsh-public-access` (forked from JNan-QQ/dsh-public-access).
 >
-> **Compatibility**: 2.2.0-beta targets **dsh 0.2.1-rc.2** (`>=0.2.1-rc.2 <0.3.0`). Stay on plugin 1.3.0 for dsh 0.1.x.
+> **Current version**: `2.3.0-beta.1`, targeting **dsh `>=0.2.1-rc.2 <0.3.0`** (verified on 0.2.1-rc.5). Stay on plugin 1.3.0 for dsh 0.1.x.
 
 ## 📖 Overview
 
@@ -30,20 +30,20 @@ Public / LAN access plugin for DeepSeek Harness — `0.0.0.0` binding, `--public
 | 🚀 **Auto-detection** | `start.sh` detects the public IP and configures trusted-host / public-url; LAN addresses are derived from the NICs by `web-startup` |
 | 🧹 **Revocable logout** | Logout clears `dsh_session` and every `dsh-auth-*` native cookie carried by the request |
 
-Settings → Auth (live screenshot; `docs/settings-panel.zh.png` is the Chinese build):
+Settings → Auth (live screenshot on dsh 0.2.1-rc.5; the Chinese build is [`docs/settings-panel.zh.png`](docs/settings-panel.zh.png)):
 
 ![Settings → Auth](docs/settings-panel.en.png)
 
-## ⬆️ Upgrading to 2.2.0-beta.2 (pre-release)
+## ⬆️ Upgrading to 2.3.0-beta.1
 
-> **Pre-release**: `2.2.0-beta.2` is a test build for the credential store, login throttling and the Settings → Auth panel; the stable `2.2.0` follows once it settles. Install it by explicit version (`@2.2.0-beta.2`) — pre-releases are never picked up by `@latest`.
+> `2.3.0-beta.1` rebuilds the credential model and adds login throttling plus a settings panel on top of `2.2.0-beta`. It is **not merged into the `2.2.0-beta` release line**. Install it by explicit version (`@2.3.0-beta.1`) — pre-releases are never picked up by `@latest`.
 
-### What changed in 2.2.0-beta.2 (includes breaking changes)
+### What changed (includes breaking changes)
 
 **Credential model rewritten (breaking)**
 
-- **No more `admin/admin`.** On first start without `DSH_AUTH_PASS`, the plugin **generates a random administrator password**, prints it, and writes it to `$DSH_HOME/dsh-public-access.initial-password` (`0600`, under `~/.dsh` by default) so it can be recovered from another terminal. Change it under **Settings → Auth**; the plaintext file is deleted as soon as you do.
-- **Credentials live in a file**: `$DSH_HOME/dsh-public-access.json` (`0600`, directory `0700`) holding the administrator name, a `scrypt` hash, and a **random session signing secret**. The environment only seeds it on the very first start; once the file exists `DSH_AUTH_PASS` is ignored with a printed notice — a stale unit-file variable must not silently undo a password set in the panel.
+- **No more `admin/admin`.** On first start without `DSH_AUTH_PASS`, the plugin **generates a random administrator password**, prints it, and writes it to `$DSH_HOME/dsh-public-access.initial-password` (`0600`, under `~/.dsh` by default). Change it under **Settings → Auth**; the plaintext file is deleted as soon as you do.
+- **Credentials live in a file**: `$DSH_HOME/dsh-public-access.json` (`0600`, directory `0700`) holding the administrator name, a `scrypt` hash and a **random session signing secret**. The environment only seeds it on the very first start; once the file exists `DSH_AUTH_PASS` is ignored with a printed notice.
 - **Password hashing is now `scrypt`** (N=16384, r=8, p=1, random 16-byte salt) instead of `SHA-256(salt‖password)`.
 - **`DSH_AUTH_SALT` is gone** (setting it has no effect).
 - **Everyone signs in once after upgrading**: the session secret is no longer derived from the password hash, so old `dsh_session` cookies cannot validate.
@@ -51,22 +51,22 @@ Settings → Auth (live screenshot; `docs/settings-panel.zh.png` is the Chinese 
 
 **New**
 
-- **Login throttling**: 5 failures from one client address lock it for 30 seconds; past 20 failures overall a **global exponential backoff** starts (doubling every 10 more failures, 5s → … → 5 min cap) with `429` + `Retry-After`. Genuine loopback callers are exempt from the global penalty so an attacker cannot lock the administrator out of their own machine.
-- **Settings → Auth panel**: a new client plugin that changes the password and signs out. A successful change rotates the session secret, so **every other browser is signed out instantly** while the current one receives a fresh cookie. Copy follows the deployment language; styling uses only `--dsw-alias-*` theme tokens.
-- **`dsh --profile web auth-reset`**: the recovery path for a forgotten password, with a hidden interactive prompt or `--password`, plus `--username`. It always rotates the session secret.
-- **`DSH_AUTH_REQUIRE_SESSION=1`**: makes the plugin session the **only** credential; the launch-token URL and dsh's native 30-day browser cookie stop working (off by default).
-- **`DSH_AUTH_PROTECT_ROUTES=1`**: puts third-party webserver routes behind the plugin session too (off by default, since it wraps the harness's private route tables). While off, startup logs which routes sit outside the gate.
-- Logout is now `POST /_auth/logout`; `GET` still works for same-site requests (checked via `Sec-Fetch-Site`) so another page cannot force a sign-out.
-- `--host` with a concrete IPv4/IPv6 literal is now gated on the same schema widening and fails loudly instead of booting into a confusing schema error.
+- **Login throttling**: 5 failures from one client address lock it for 30 seconds; past 20 failures overall a global exponential backoff starts (doubling every 10 more failures, 5s → … → 5 min cap) with `429` + `Retry-After`. Genuine loopback callers are exempt from the global penalty.
+- **Settings → Auth panel**: change the password and sign out. A successful change rotates the session secret, so **every other browser is signed out instantly** while the caller receives a fresh cookie. Copy follows the deployment language; styling uses only `--dsw-alias-*` theme tokens.
+- **`dsh --profile web auth-reset`**: the recovery path for a forgotten password (hidden interactive prompt or `--password`), plus `--username`. It always rotates the session secret.
+- **`DSH_AUTH_REQUIRE_SESSION=1`**: the plugin session becomes the **only** credential; the launch-token URL and dsh's native 30-day cookie stop working (off by default).
+- **`DSH_AUTH_PROTECT_ROUTES=1`**: puts third-party webserver routes behind the plugin session (off by default). While off, startup lists the routes outside the gate.
+- Logout is now `POST /_auth/logout`; `GET` still works for same-site requests so another page cannot force a sign-out.
+- `--host` with a concrete IPv4/IPv6 literal is now gated on the same schema widening and fails loudly.
 
 ### From 2.1.x / 2.2.0-beta
 
 ```bash
-dsh plugin --profile web add @timgong/dsh-public-access@2.2.0-beta.2
+dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1
 sudo systemctl restart dsh   # or restart your dsh --profile web process
 ```
 
-1. If your unit file still carries `DSH_AUTH_PASS`, it is seeded into the credential file **once**; delete the variable afterwards (the plugin will say it is ignored).
+1. If your unit file still carries `DSH_AUTH_PASS`, it is seeded into the credential file **once**; delete the variable afterwards (the plugin will say it is ignored). The seeded password is that variable's value.
 2. If you never set `DSH_AUTH_PASS` (i.e. you were using `admin/admin`): the old password stops working immediately. Take the generated password from the startup log or `~/.dsh/dsh-public-access.initial-password`, then change it in the panel.
 3. Every browser signs in once (the secret rotated).
 4. To go back to a fixed password, use **Settings → Auth** or `dsh --profile web auth-reset`.
@@ -75,9 +75,9 @@ sudo systemctl restart dsh   # or restart your dsh --profile web process
 
 The 0.1.x → 0.2.1 upstream auth entry point and behaviour both changed; 2.0.0 is a breaking release, and 2.1.1 renamed the package from `dsh-public-access` to **`@timgong/dsh-public-access`**, so remove the old package first:
 
-1. upgrade dsh to `0.2.1-rc.2`;
+1. upgrade dsh to `0.2.1-rc.2` or newer;
 2. `dsh plugin --profile web remove dsh-public-access`;
-3. `dsh plugin --profile web add @timgong/dsh-public-access@2.2.0-beta.2` (or `github:laoer/dsh-public-access` / a local path before it is on npm);
+3. `dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1` (or `github:laoer/dsh-public-access` / a local path before it is on npm);
 4. restart `dsh --profile web` and sign in with the generated password from the log or `~/.dsh/dsh-public-access.initial-password`;
 5. confirm the startup log has no `webserver: ... wildcard ...` and that `/` redirects to `/_auth/login`.
 
@@ -89,7 +89,7 @@ Still on dsh 0.1.x? Stay on plugin 1.3.0; do not upgrade to 2.x.
 
 ```bash
 # When published to npm
-dsh plugin --profile web add @timgong/dsh-public-access@2.2.0-beta
+dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1
 
 # From GitHub (pnpm reads the package.json in the repository)
 dsh plugin --profile web add github:laoer/dsh-public-access
@@ -310,24 +310,108 @@ server {
 }
 ```
 
+## 🧭 How it works
+
+### Three gates, two of which the plugin hooks
+
+dsh 0.2.1 splits the web entry point by request type. The plugin feeds its session into two of the three paths and leaves the third to upstream:
+
+| Request | dsh gate | What the plugin does |
+|---|---|---|
+| `/api` and API WebSocket upgrades | `connection.admit(req)` | Valid session → admitted as `browserPeer` (owner identity); otherwise hand the request back to upstream |
+| `/` and `index.html` | `connection.authorizeIndex(req, res)` | Valid session → serve it and renew opportunistically on this load; otherwise `302 /_auth/login` |
+| Static assets, plugin-owned routes, `/connect` | none upstream | Not wrapped by default (`DSH_AUTH_PROTECT_ROUTES=1` brings third-party routes in) |
+
+```text
+browser
+  │  GET /              Cookie: dsh_session
+  ▼
+dsh webserver ──► connection.authorizeIndex ──► valid ─► render the SPA (renewing the cookie)
+                                              └ invalid ─► 302 /_auth/login
+  │  POST /api/...
+  ▼
+/api route ──► connection.admit ──► valid ─► browserPeer (owner)
+                                  └ invalid ─► upstream native gate (launch-token cookie / 401)
+  │  POST /_auth/login       (plugin-owned exact route — neither gate above applies)
+  ▼
+verify credentials → issue dsh_session → 302 ../
+```
+
+### Why "layer on top" rather than "take over"
+
+The plugin never wraps `webServer.register` and never forges dsh's native `dsh-auth-*` cookie; it only uses the two admission methods upstream documents.
+
+- **Gain**: when upstream reshapes its internals the plugin fails **loudly at startup** instead of "looks fine, gate silently gone".
+- **Cost**: coverage is whatever upstream defines — a route another plugin registers directly on `webServer` is outside it. Startup lists those routes, and `DSH_AUTH_PROTECT_ROUTES=1` brings them behind the gate.
+
+### Sessions and cookies
+
+- `dsh_session` looks like `issuedAt.expiresAt.HMAC-SHA256`; the key lives in the credential file, so a restart keeps sessions alive while a password change signs everyone out.
+- Sliding renewal: idle expiry after `DSH_AUTH_IDLE_HOURS` (24h), at most one renewal per `DSH_AUTH_RENEW_MINUTES` (5min) while active, absolute cap `DSH_AUTH_MAX_DAYS` (7d).
+- Two renewal paths: the heartbeat injected into the index (only while the tab is visible **and** the user has produced input in that window, via `POST /_auth/renew`), and opportunistic renewal on every index load (covering JS-disabled clients).
+- Attributes: `HttpOnly; SameSite=Lax`, plus `Secure` when TLS is direct or `--public-url` is `https:`.
+
+### The two injected browser scripts
+
+1. `globalThis.__DSH_TRANSPORT__.ownsHost = true` — gives non-loopback access the same `isLoopback` state as loopback; otherwise the settings mirror degrades to memory mode (the Models page then reports `settings are unavailable in this browser`).
+2. A `crypto.randomUUID` polyfill — plain HTTP is a non-secure context and every RPC throws `TypeError` without it.
+
+## 🔑 Credentials and sessions
+
+### The credential file
+
+`$DSH_HOME/dsh-public-access.json` (`~/.dsh/` by default, file `0600`, directory `0700`):
+
+```json
+{
+  "version": 1,
+  "username": "admin",
+  "passwordHash": "scrypt$16384$8$1$<salt-hex>$<hash-hex>",
+  "secret": "<32 bytes, hex>",
+  "createdAt": 1793350000000,
+  "updatedAt": 1793350000000
+}
+```
+
+- `passwordHash`: `scrypt` (N=16384, r=8, p=1, random 16-byte salt). The cost parameters live inside the string, so raising them later does not break the format.
+- `secret`: the session HMAC key. **A password change, a rename, or `auth-reset` rotates it** — that is what "changing the password signs every browser out" actually means.
+- No plaintext password is stored, and reads are cached by `mtime+size` so each request does not re-parse the file.
+
+### What happens on first start
+
+| Situation | Result |
+|---|---|
+| Credential file exists | Used as-is; `DSH_AUTH_PASS` is ignored (with a notice) even if set |
+| No file, `DSH_AUTH_PASS` set | That password seeds it **once** (migration path), then you are told to remove the variable |
+| No file, no password | A random 20-character password is printed and written to `dsh-public-access.initial-password` (`0600`) |
+
+### Changing and recovering
+
+| Goal | How | Side effect |
+|---|---|---|
+| Change the password | Settings → Auth, or `auth-reset --password '<new>'` | Secret rotated; other browsers signed out; plaintext file removed |
+| Rename the administrator | `auth-reset --username <name>` | Same as above |
+| Forgot the password | `dsh --profile web auth-reset` (hidden interactive prompt) | Same as above |
+| Start over | Delete the credential file and restart | A fresh random password |
+| Several instances | Give each its own `DSH_HOME`, or point `DSH_AUTH_FILE` elsewhere | — |
+
+### Login throttling
+
+Five failures from one address lock it for 30 seconds; past 20 failures a global exponential backoff starts (doubling every 10 more, 5s → … → 5min cap), answered with `429` + `Retry-After`. Only the TCP peer address counts — `X-Forwarded-For` is never trusted — and genuine loopback callers are exempt from the global penalty so an attacker cannot lock the administrator out of their own machine.
+
+> Behind a reverse proxy every client shares the proxy's address, which makes the per-address limit stricter than intended. Raise `DSH_AUTH_MAX_FAILURES` there, or throttle at the proxy instead.
+
 ## 🔒 Security
 
 ### Authentication (dsh 0.2.1 adaptation)
 
-dsh 0.2.1 introduced native browser auth for the web UI: each process generates a random launch token, and visiting `http://<host>:<port>/?token=...` exchanges it for a signed cookie bound to that authority (30 days by default). Both `/api` and `index.html` require that cookie, and `/api` additionally passes the Host/Origin fence first. This plugin layers username/password login **on top** of that mechanism:
+dsh 0.2.1 ships its own browser auth (a launch token exchanged for a 30-day signed cookie, required by both `/api` and the index, with `/api` also passing the Host/Origin fence first). This plugin layers its own session **on top**:
 
-- **Credential source**: `$DSH_HOME/dsh-public-access.json` (`~/.dsh/` by default, `0600`, directory `0700`). Passwords are hashed with `scrypt` (N=16384, r=8, p=1, random 16-byte salt); the session secret is a separate random 32-byte value that is **rotated on every password change**, so "change the password" really does sign every browser out.
-- **First start**: with no credential file, `DSH_AUTH_PASS` (if set) seeds it once; otherwise the plugin **generates a random password** and writes it to `$DSH_HOME/dsh-public-access.initial-password` (`0600`). There is **no `admin/admin` account**. The plaintext file is deleted after a successful password change.
-- **Environment variables are not a password store**: once the file exists `DSH_AUTH_PASS` is ignored with a printed notice. Environment variables are visible to other local users (`ps e`, `/proc/<pid>/environ`, unit files) and are only a migration input.
-- **Auth wiring**: in dsh 0.2.1, `/api` and API WebSocket upgrades go through `connection.admit`, and the index goes through `connection.authorizeIndex`. The plugin feeds a valid `dsh_session` into both; everything else falls through to dsh's native token/cookie flow unchanged. With `DSH_AUTH_REQUIRE_SESSION=1` that fall-through is removed and the plugin session is the sole credential.
-- **Login throttling**: 5 failures from one client address lock it for 30 seconds; past 20 failures overall a global exponential backoff applies (doubling every 10 more failures, capped at 5 minutes), answered with `429` and `Retry-After`. Only the TCP peer address counts — `X-Forwarded-For` is never trusted — and genuine loopback callers are exempt from the global penalty so an attacker cannot lock the administrator out of their own machine.
-- **Trust fence**: the Host/Origin fence still applies. `--trusted-host` declares public IPs/domains; with `0.0.0.0` the plugin derives LAN addresses from the NICs and `start.sh` additionally probes the public IP. An undeclared Host gets 403 on `/api`.
-- **Sliding renewal**: a session expires after `DSH_AUTH_IDLE_HOURS` (24 by default) of inactivity, renews at most once per `DSH_AUTH_RENEW_MINUTES` (5 by default) while in use, and never exceeds `DSH_AUTH_MAX_DAYS` (7 by default) from login. There are two renewal paths: the heartbeat script injected into the index calls `POST /_auth/renew` (only while the tab is visible and the user has produced keyboard/pointer input in that interval), and every index load renews opportunistically inside the auth gate (covering JS-disabled browsers and static deployments). The heartbeat only refreshes an existing session — `/_auth/renew` never hands a cookie to an unauthenticated request and requires the `x-dsh-renew: 1` header, which cross-site forms and images cannot set.
-- **Password change**: `GET /_auth/password` returns the administrator name and the panel copy; `POST /_auth/password` takes JSON `{oldPassword, newPassword}` (8+ characters). It requires a live session, `application/json`, and a same-site request, so a cross-site form cannot reach it; the response re-issues the caller's cookie after the secret rotates.
-- **Logout**: `POST /_auth/logout` clears `dsh_session` plus every `dsh-auth-*` native cookie carried by the request. `GET` still works for same-site requests (via `Sec-Fetch-Site`), and a cross-site `GET` is refused so another page cannot sign you out.
-- **Login-page language**: resolved as `?lang=` → `dsh_lang` cookie → `DSH_AUTH_LANG` → `Accept-Language`. The cookie is written only when the visitor picks a language from the page links (one year), so auto-detection is never pinned by accident.
-- **Session tokens**: `dsh_session` is `issuedAt.expiresAt.signature`, signed with HMAC-SHA256 and a domain-separation prefix. Tokens from the pre-2.2.1 signing scheme are rejected outright — the upgrade signs everyone in once.
-- **Frontend compatibility**: an injected script sets `globalThis.__DSH_TRANSPORT__.ownsHost = true`, giving public access the same `isLoopback` state as loopback (host-side settings persistence, file open, …), and polyfills `crypto.randomUUID` on plain-HTTP public origins.
+- **Wiring**: `connection.admit` (`/api` + API WS upgrades) and `connection.authorizeIndex` (index) — see [How it works](#-how-it-works).
+- **Credentials and sessions**: `scrypt` at rest, random signing secret, password change signs everyone out — see [Credentials and sessions](#-credentials-and-sessions).
+- **Trust fence**: unchanged. `--trusted-host` declares public IPs/domains; with `--host 0.0.0.0` the plugin derives LAN authorities from the NICs and `start.sh` probes the public IP. An undeclared Host gets 403 on `/api`.
+- **Session-only mode**: with `DSH_AUTH_REQUIRE_SESSION=1` the launch token and the native 30-day cookie stop working, leaving only the revocable plugin session.
+- **Logout**: clears `dsh_session` plus every `dsh-auth-*` native cookie on the request; a cross-site `GET` is refused.
 
 ### Security boundaries of wildcard binding
 
@@ -345,6 +429,19 @@ dsh 0.2.1 rejects `0.0.0.0` on the grounds that exposing every interface amplifi
 3. **Use HTTPS**: terminate TLS in nginx, or configure `--tls-cert` / `--tls-key`.
 4. **Restrict access**: limit source IPs with a firewall or security group.
 5. **Keep it current**: keep the plugin and dsh versions in sync.
+
+### Go-live checklist
+
+Work through it in order; do not expose the port to an untrusted network with any item unchecked:
+
+- [ ] **Replace the generated password**: Settings → Auth, then confirm `~/.dsh/dsh-public-access.initial-password` is gone
+- [ ] **Bind as narrowly as possible**: a private interface if you can; if you use `0.0.0.0`, a firewall/security group is mandatory
+- [ ] **TLS in place**: `--tls-cert`/`--tls-key` or nginx, then verify the cookie carries `Secure` (`curl -skD- -X POST …`)
+- [ ] **trusted-host complete**: every public name/IP declared, otherwise `/api` answers 403
+- [ ] **Read the uncovered-route list**: the startup `outside the plugin session gate` line should be empty or contain only plugins you trust
+- [ ] **Firewall/security group** allows only the sources you need
+- [ ] **`DSH_AUTH_REQUIRE_SESSION`**: set to `1` if the launch-token URL must not be an alternate entry
+- [ ] **Reverse proxy**: forwards the real `Host` (otherwise the fence answers 403) and dsh listens on `127.0.0.1` only
 
 ## 🛠️ Troubleshooting
 
@@ -413,11 +510,11 @@ Confirm that `web-startup` is disabled and `public-access-web-startup` is insert
 
 #### 5. The login POST returns 405 at `/_auth/_auth/login`
 
-2.1.0 used the wrong relative path (`_auth/login`) in the login form, so `/_auth/login` resolved to `/_auth/_auth/login`. 2.1.1 switched to the sibling `login` and fixed the relative redirects after login and logout. After upgrading to 2.2.0-beta, force-reload the login page (or clear the cache):
+2.1.0 used the wrong relative path (`_auth/login`) in the login form, so `/_auth/login` resolved to `/_auth/_auth/login`. 2.1.1 switched to the sibling `login` and fixed the relative redirects after login and logout. After upgrading to 2.3.0-beta.1, force-reload the login page (or clear the cache):
 
 ```bash
 dsh plugin --profile web remove dsh-public-access
-dsh plugin --profile web add @timgong/dsh-public-access@2.2.0-beta
+dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1
 sudo systemctl restart dsh
 ```
 
@@ -476,10 +573,12 @@ dsh-public-access/
 │   ├── web-startup.js         # web startup config (host schema widening, new flags, trustedHosts derivation)
 │   ├── webserver-schema.js    # boot-path webserver host schema widening + LAN authority derivation
 │   └── public-url.js          # --public-url validation (same rules as stock)
-├── test/                      # node:test unit tests
+├── docs/                      # screenshots and other static assets (shipped on npm)
+├── test/                      # node:test unit tests (83)
 ├── tsconfig.json              # type-check config (noEmit)
 ├── tsconfig.build.json        # node-half build (emits src/*.js in place; excludes client)
 ├── tsconfig.client.json       # browser-half build (moduleDetection: legacy)
+├── .github/workflows/ci.yml    # CI: typecheck + test + artifact freshness
 ├── cordis.patch.yml           # DSH plugin configuration patch
 ├── start.sh                   # launch script
 ├── package.json               # package metadata

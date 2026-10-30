@@ -666,3 +666,11 @@ npm run verify:artifacts  # build 后校验 src/*.js 与提交版本一致（发
 ---
 
 **享受使用 DeepSeek Harness 的愉快体验！** 🎉
+
+---
+
+<p align="center">
+  <a href="https://doseloop.bohely.cn" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.bohely.cn/doseloop/banner-2.png" alt="DoseLoop" width="100%">
+  </a>
+</p>

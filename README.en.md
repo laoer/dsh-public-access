@@ -664,3 +664,11 @@ Questions and suggestions are welcome:
 ---
 
 **Enjoy DeepSeek Harness!** 🎉
+
+---
+
+<p align="center">
+  <a href="https://doseloop.bohely.cn" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.bohely.cn/doseloop/banner-2.png" alt="DoseLoop" width="100%">
+  </a>
+</p>

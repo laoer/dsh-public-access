@@ -658,7 +658,7 @@ Released under the [Mulan Permissive Software License, Version 2](LICENSE) (Mula
 
 Questions and suggestions are welcome:
 
-- Open an issue on the Gitee repository.
+- Open an issue on the GitHub repository.
 - Email the maintainer.
 
 ---

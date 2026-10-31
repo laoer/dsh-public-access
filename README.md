@@ -660,7 +660,7 @@ npm run verify:artifacts  # build 后校验 src/*.js 与提交版本一致（发
 
 如有问题或建议，请通过以下方式联系：
 
-- 提交 Issue 到 Gitee 仓库
+- 提交 Issue 到 GitHub 仓库
 - 发送邮件至维护者
 
 ---

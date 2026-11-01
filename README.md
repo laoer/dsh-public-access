@@ -6,7 +6,7 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 
 > **包名**：`@timgong/dsh-public-access`（fork 自 JNan-QQ/dsh-public-access）。
 >
-> **当前版本**：`2.3.0-beta.1`，适配 **dsh `>=0.2.1-rc.2 <0.3.0`**（实测基线 0.2.1-rc.5）。dsh 0.1.x 请继续使用插件 1.3.0。
+> **当前版本**：`2.3.0`（稳定版），适配 **dsh `>=0.2.1-rc.2 <0.3.0`**（实测基线 0.2.1-rc.5）。dsh 0.1.x 请继续使用插件 1.3.0。
 
 ## 📖 简介
 
@@ -39,9 +39,9 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 
 ![设置面板 → 认证](docs/settings-panel.zh.png)
 
-## ⬆️ 升级到 2.3.0-beta.1
+## ⬆️ 升级到 2.3.0
 
-> `2.3.0-beta.1` 是在 `2.2.0-beta` 基础上重做凭据模型、加上登录限速与设置面板的一版，**不并入 `2.2.0-beta` 发布线**。安装请写显式版本号（`@2.3.0-beta.1`），预发布版本不会被 `@latest` 命中。
+> `2.3.0` 是稳定版：在 `2.2.0-beta` 的基础上重做凭据模型、加上登录限速与「设置 → 认证」面板。`@latest` 即指向本版本，`npm ... add @timgong/dsh-public-access` 不带版本号即是它。
 
 ### 本版变更（含破坏性变更）
 
@@ -67,7 +67,7 @@ DeepSeek Harness 公网 / 局域网访问插件 — 支持 `0.0.0.0` 绑定、`-
 ### 从 2.1.x / 2.2.0-beta 升级
 
 ```bash
-dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1
+dsh plugin --profile web add @timgong/dsh-public-access@2.3.0
 sudo systemctl restart dsh   # 或重启你的 dsh --profile web 进程
 ```
 
@@ -82,7 +82,7 @@ sudo systemctl restart dsh   # 或重启你的 dsh --profile web 进程
 
 1. 先把 dsh 升级到 `0.2.1-rc.2` 或更新；
 2. 移除旧包：`dsh plugin --profile web remove dsh-public-access`；
-3. 安装新包：`dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1`（未发布 npm 时用 `github:laoer/dsh-public-access` 或本地路径）；
+3. 安装新包：`dsh plugin --profile web add @timgong/dsh-public-access@2.3.0`（未发布 npm 时用 `github:laoer/dsh-public-access` 或本地路径）；
 4. 重启 `dsh --profile web`，从日志或 `~/.dsh/dsh-public-access.initial-password` 取随机密码登录；
 5. 确认启动日志没有 `webserver: ... wildcard ...`，且访问 `/` 会跳转 `/_auth/login`。
 
@@ -94,7 +94,7 @@ sudo systemctl restart dsh   # 或重启你的 dsh --profile web 进程
 
 ```bash
 # 已发布到 npm 时（预发布请写显式版本号）
-dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1
+dsh plugin --profile web add @timgong/dsh-public-access@2.3.0
 
 # 未发布 npm 时，从 GitHub 仓库安装（pnpm 读取仓库里的 package.json）
 dsh plugin --profile web add github:laoer/dsh-public-access
@@ -515,11 +515,11 @@ dsh --profile web --dump-config | grep -A3 web-startup
 
 #### 5. 登录 POST 返回 405，地址是 `/_auth/_auth/login`
 
-2.1.0 的登录表单使用了错误的相对路径（`_auth/login`），从 `/_auth/login` 会拼成 `/_auth/_auth/login`。2.1.1 已改为同级 `login`，并修正登录成功/登出的相对跳转。升级到 2.3.0-beta.1 后强制刷新登录页（或清缓存）：
+2.1.0 的登录表单使用了错误的相对路径（`_auth/login`），从 `/_auth/login` 会拼成 `/_auth/_auth/login`。2.1.1 已改为同级 `login`，并修正登录成功/登出的相对跳转。升级到 2.3.0 后强制刷新登录页（或清缓存）：
 
 ```bash
 dsh plugin --profile web remove dsh-public-access
-dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1
+dsh plugin --profile web add @timgong/dsh-public-access@2.3.0
 sudo systemctl restart dsh
 ```
 

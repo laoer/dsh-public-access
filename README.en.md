@@ -6,7 +6,7 @@ Public / LAN access plugin for DeepSeek Harness — `0.0.0.0` binding, `--public
 
 > **Package**: `@timgong/dsh-public-access` (forked from JNan-QQ/dsh-public-access).
 >
-> **Current version**: `2.3.0-beta.1`, targeting **dsh `>=0.2.1-rc.2 <0.3.0`** (verified on 0.2.1-rc.5). Stay on plugin 1.3.0 for dsh 0.1.x.
+> **Current version**: `2.3.0` (stable), targeting **dsh `>=0.2.1-rc.2 <0.3.0`** (verified on 0.2.1-rc.5). Stay on plugin 1.3.0 for dsh 0.1.x.
 
 ## 📖 Overview
 
@@ -34,9 +34,9 @@ Settings → Auth (live screenshot on dsh 0.2.1-rc.5; the Chinese build is [`doc
 
 ![Settings → Auth](docs/settings-panel.en.png)
 
-## ⬆️ Upgrading to 2.3.0-beta.1
+## ⬆️ Upgrading to 2.3.0
 
-> `2.3.0-beta.1` rebuilds the credential model and adds login throttling plus a settings panel on top of `2.2.0-beta`. It is **not merged into the `2.2.0-beta` release line**. Install it by explicit version (`@2.3.0-beta.1`) — pre-releases are never picked up by `@latest`.
+> `2.3.0` is the stable release: it rebuilds the credential model and adds login throttling plus the Settings → Auth panel on top of `2.2.0-beta`. `@latest` points at this version, so `dsh plugin --profile web add @timgong/dsh-public-access` (no version) installs it.
 
 ### What changed (includes breaking changes)
 
@@ -62,7 +62,7 @@ Settings → Auth (live screenshot on dsh 0.2.1-rc.5; the Chinese build is [`doc
 ### From 2.1.x / 2.2.0-beta
 
 ```bash
-dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1
+dsh plugin --profile web add @timgong/dsh-public-access@2.3.0
 sudo systemctl restart dsh   # or restart your dsh --profile web process
 ```
 
@@ -77,7 +77,7 @@ The 0.1.x → 0.2.1 upstream auth entry point and behaviour both changed; 2.0.0 
 
 1. upgrade dsh to `0.2.1-rc.2` or newer;
 2. `dsh plugin --profile web remove dsh-public-access`;
-3. `dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1` (or `github:laoer/dsh-public-access` / a local path before it is on npm);
+3. `dsh plugin --profile web add @timgong/dsh-public-access@2.3.0` (or `github:laoer/dsh-public-access` / a local path before it is on npm);
 4. restart `dsh --profile web` and sign in with the generated password from the log or `~/.dsh/dsh-public-access.initial-password`;
 5. confirm the startup log has no `webserver: ... wildcard ...` and that `/` redirects to `/_auth/login`.
 
@@ -89,7 +89,7 @@ Still on dsh 0.1.x? Stay on plugin 1.3.0; do not upgrade to 2.x.
 
 ```bash
 # When published to npm
-dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1
+dsh plugin --profile web add @timgong/dsh-public-access@2.3.0
 
 # From GitHub (pnpm reads the package.json in the repository)
 dsh plugin --profile web add github:laoer/dsh-public-access
@@ -510,11 +510,11 @@ Confirm that `web-startup` is disabled and `public-access-web-startup` is insert
 
 #### 5. The login POST returns 405 at `/_auth/_auth/login`
 
-2.1.0 used the wrong relative path (`_auth/login`) in the login form, so `/_auth/login` resolved to `/_auth/_auth/login`. 2.1.1 switched to the sibling `login` and fixed the relative redirects after login and logout. After upgrading to 2.3.0-beta.1, force-reload the login page (or clear the cache):
+2.1.0 used the wrong relative path (`_auth/login`) in the login form, so `/_auth/login` resolved to `/_auth/_auth/login`. 2.1.1 switched to the sibling `login` and fixed the relative redirects after login and logout. After upgrading to 2.3.0, force-reload the login page (or clear the cache):
 
 ```bash
 dsh plugin --profile web remove dsh-public-access
-dsh plugin --profile web add @timgong/dsh-public-access@2.3.0-beta.1
+dsh plugin --profile web add @timgong/dsh-public-access@2.3.0
 sudo systemctl restart dsh
 ```
 
